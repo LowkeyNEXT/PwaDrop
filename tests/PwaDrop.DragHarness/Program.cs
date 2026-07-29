@@ -1,11 +1,14 @@
+using System.Text;
+using PwaDrop.App.Drag;
 using PwaDrop.App.Interop;
+using PwaDrop.Core;
 
 namespace PwaDrop.DragHarness;
 
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static int Main(string[] args)
     {
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
@@ -18,12 +21,66 @@ internal static class Program
 
         try
         {
+            if (args.Contains("--self-test", StringComparer.OrdinalIgnoreCase))
+            {
+                return RunSelfTest();
+            }
+
             Application.Run(new HarnessForm());
+            return 0;
         }
         finally
         {
             NativeMethods.OleUninitialize();
         }
     }
-}
 
+    private static int RunSelfTest()
+    {
+        var cacheRoot = Path.Combine(Path.GetTempPath(), "PwaDrop.SelfTest", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var eml = Encoding.UTF8.GetBytes("Subject: PwaDrop async self-test\r\n\r\nTest body.\r\n");
+            var pdf = Encoding.ASCII.GetBytes("%PDF-1.4\n% PwaDrop self-test\n%%EOF\n");
+            using var dataObject = new VirtualFileDataObject(
+                new VirtualTestFile("test-conversation.eml", eml),
+                new VirtualTestFile("invoice.pdf", pdf));
+            var extractor = new VirtualFileExtractor(new CacheManager(cacheRoot));
+            var payloadKind = extractor.DetectPayload(dataObject);
+            if (payloadKind != DragPayloadKind.AsyncFileDrop)
+            {
+                throw new InvalidOperationException($"Expected an async file drop, received {payloadKind}.");
+            }
+
+            var extraction = extractor.Extract(dataObject, payloadKind);
+            if (extraction.Files.Count != 2 ||
+                !File.ReadAllBytes(extraction.Files[0]).SequenceEqual(eml) ||
+                !File.ReadAllBytes(extraction.Files[1]).SequenceEqual(pdf))
+            {
+                throw new InvalidDataException("The extracted test files did not match the delayed source data.");
+            }
+
+            Console.WriteLine("Delayed CF_HDROP self-test passed.");
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            Console.Error.WriteLine(exception);
+            return 1;
+        }
+        finally
+        {
+            try
+            {
+                if (Directory.Exists(cacheRoot))
+                {
+                    Directory.Delete(cacheRoot, recursive: true);
+                }
+            }
+            catch (IOException)
+            {
+                // CI cleanup will remove the temporary directory.
+            }
+        }
+    }
+}

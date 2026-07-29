@@ -9,52 +9,64 @@ namespace PwaDrop.App.Drag;
 internal sealed class OleRelayDropTarget : IOleDropTarget
 {
     private readonly VirtualFileExtractor _extractor;
-    private readonly Func<ComTypes.IDataObject, NativeMethods.PointL, bool> _drop;
+    private readonly Func<ComTypes.IDataObject, NativeMethods.PointL, DragPayloadKind, bool> _drop;
     private readonly Action _leave;
-    private bool _supported;
+    private readonly Action _unsupported;
+    private DragPayloadKind _payloadKind;
 
     internal OleRelayDropTarget(
         VirtualFileExtractor extractor,
-        Func<ComTypes.IDataObject, NativeMethods.PointL, bool> drop,
-        Action leave)
+        Func<ComTypes.IDataObject, NativeMethods.PointL, DragPayloadKind, bool> drop,
+        Action leave,
+        Action unsupported)
     {
         _extractor = extractor;
         _drop = drop;
         _leave = leave;
+        _unsupported = unsupported;
     }
 
     public int DragEnter(ComTypes.IDataObject dataObject, uint keyState, NativeMethods.PointL point, ref uint effect)
     {
-        _supported = _extractor.CanExtract(dataObject);
-        effect = _supported ? NativeMethods.DropEffectCopy : NativeMethods.DropEffectNone;
+        _payloadKind = _extractor.DetectPayload(dataObject);
+        effect = _payloadKind != DragPayloadKind.Unsupported
+            ? NativeMethods.DropEffectCopy
+            : NativeMethods.DropEffectNone;
+        if (_payloadKind == DragPayloadKind.Unsupported)
+        {
+            _unsupported();
+        }
+
         return 0;
     }
 
     public int DragOver(uint keyState, NativeMethods.PointL point, ref uint effect)
     {
-        effect = _supported ? NativeMethods.DropEffectCopy : NativeMethods.DropEffectNone;
+        effect = _payloadKind != DragPayloadKind.Unsupported
+            ? NativeMethods.DropEffectCopy
+            : NativeMethods.DropEffectNone;
         return 0;
     }
 
     public int DragLeave()
     {
-        _supported = false;
+        _payloadKind = DragPayloadKind.Unsupported;
         _leave();
         return 0;
     }
 
     public int Drop(ComTypes.IDataObject dataObject, uint keyState, NativeMethods.PointL point, ref uint effect)
     {
-        if (!_supported)
+        if (_payloadKind == DragPayloadKind.Unsupported)
         {
             effect = NativeMethods.DropEffectNone;
             return 0;
         }
 
-        effect = _drop(dataObject, point)
+        effect = _drop(dataObject, point, _payloadKind)
             ? NativeMethods.DropEffectCopy
             : NativeMethods.DropEffectNone;
-        _supported = false;
+        _payloadKind = DragPayloadKind.Unsupported;
         return 0;
     }
 }

@@ -9,12 +9,12 @@
 PwaDrop is an open-source Windows utility that turns New Outlook's asynchronous virtual files into normal file drops. It is designed for the missing workflow where an email or attachment can be dragged to File Explorer, but not directly into a browser upload target, a ServiceNow ticket, or another Windows application.
 
 > [!IMPORTANT]
-> This repository contains a cross-compiling MVP and a purpose-built Windows drag harness. It has not yet been exercised against a live New Outlook session from this macOS development environment. Treat `0.1.0` as an alpha until the [Windows validation matrix](docs/WINDOWS-VALIDATION.md) passes.
+> This repository contains a cross-compiling MVP and a purpose-built Windows drag harness. Alpha 2 fixes the delayed `CF_HDROP` format observed in New Outlook, but still needs the complete [Windows validation matrix](docs/WINDOWS-VALIDATION.md) before it should be treated as a beta.
 
 ## MVP behavior
 
 - Watches only drags that originate from the installed New Outlook process tree.
-- Detects standard Shell virtual files (`FileGroupDescriptorW` and `FileContents`).
+- Detects Chromium's asynchronous `CF_HDROP` downloads and legacy Shell virtual files (`FileGroupDescriptorW` and `FileContents`).
 - Streams selected messages and attachments into a private per-user cache.
 - Replays the drop as normal physical file paths at the original destination.
 - Preserves `.eml` messages and original attachment names.
@@ -30,16 +30,16 @@ sequenceDiagram
     participant C as Private cache
     participant T as Browser or Windows target
 
-    O->>R: OLE virtual-file drag
-    R->>O: Request FileDescriptor/FileContents
-    O-->>R: Authenticated IStream data
-    R->>C: Stream to random temporary paths
+    O->>R: Delayed CF_HDROP drag
+    R->>O: StartOperation after Drop
+    O-->>R: Authenticated temporary paths
+    R->>C: Copy to random private paths
     R->>T: Replay as CF_HDROP files
     T-->>R: Copy accepted or rejected
     R->>C: Delayed cleanup
 ```
 
-New Outlook is a WebView2-based native application. Chromium represents download-on-drop items as virtual files, while many targets accept only real paths in `CF_HDROP`. PwaDrop bridges those documented Windows formats locally. See the [architecture notes](docs/ARCHITECTURE.md).
+New Outlook is a WebView2-based native application. Chromium advertises download-on-drop items as `CF_HDROP`, but does not materialize their temporary paths until a receiver begins an `IDataObjectAsyncCapability` operation after the drop. PwaDrop completes that operation, makes private copies, and replays stable physical paths to the destination. See the [architecture notes](docs/ARCHITECTURE.md).
 
 ## Build and run
 
@@ -64,7 +64,7 @@ In a second terminal:
 dotnet run --project .\tests\PwaDrop.DragHarness\PwaDrop.DragHarness.csproj
 ```
 
-Drag the harness's **DRAG FROM HERE** card onto **DROP HERE**. The source intentionally provides only virtual files and the target intentionally accepts only physical paths, so a successful two-file result exercises the complete relay.
+Drag the harness's **DRAG FROM HERE** card onto **DROP HERE**. The source refuses to provide paths until `StartOperation`, waits briefly, and then returns `CF_HDROP`; the target accepts only physical paths. A successful two-file result exercises the delayed materialization and replay path used by alpha 2.
 
 For a browser destination, open [`tests/browser-drop-target/index.html`](tests/browser-drop-target/index.html) in Edge or Chrome and drag the harness source onto its drop zone.
 
