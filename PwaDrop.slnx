@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PwaDrop.App/PwaDrop.App.csproj" />
+    <Project Path="src/PwaDrop.Core/PwaDrop.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PwaDrop.Core.Tests/PwaDrop.Core.Tests.csproj" />
+    <Project Path="tests/PwaDrop.DragHarness/PwaDrop.DragHarness.csproj" />
+  </Folder>
+</Solution>
+
