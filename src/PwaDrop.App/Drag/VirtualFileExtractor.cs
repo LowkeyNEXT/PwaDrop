@@ -7,6 +7,7 @@ namespace PwaDrop.App.Drag;
 
 internal sealed class VirtualFileExtractor
 {
+    private static readonly TimeSpan OriginalDropUnwindDelay = TimeSpan.FromMilliseconds(150);
     private const uint FileDescriptorHasSize = 0x00000040;
     private const uint FileDescriptorHasWriteTime = 0x00000020;
     private readonly CacheManager _cache;
@@ -49,35 +50,66 @@ internal sealed class VirtualFileExtractor
         }
     }
 
-    internal ExtractionResult Extract(ComTypes.IDataObject dataObject, DragPayloadKind payloadKind)
+    internal Task<ExtractionResult> ExtractAfterDropAsync(
+        ComTypes.IDataObject dataObject,
+        DragPayloadKind payloadKind)
     {
         if (payloadKind == DragPayloadKind.Unsupported)
         {
             throw new NotSupportedException("The drag did not contain a supported virtual-file payload.");
         }
 
-        var sessionPath = _cache.CreateSessionDirectory();
         var asyncOperation = GetAsyncCapability(dataObject);
-        var asyncStarted = false;
+        if (payloadKind != DragPayloadKind.AsyncFileDrop)
+        {
+            // Non-async virtual-file sources do not promise that their data object
+            // survives Drop, so preserve the legacy synchronous extraction path.
+            return Task.FromResult(ExtractCore(dataObject, payloadKind, asyncOperation: null, asyncStarted: false));
+        }
+
+        if (asyncOperation is null ||
+            asyncOperation.GetAsyncMode(out var asyncMode) != 0 ||
+            !asyncMode)
+        {
+            throw new InvalidOperationException("The delayed file drop did not expose an asynchronous operation.");
+        }
+
+        var startResult = asyncOperation.StartOperation(null);
+        if (startResult < 0)
+        {
+            Marshal.ThrowExceptionForHR(startResult);
+        }
+
+        return CompleteAsyncFileDropAfterOriginalDragAsync(dataObject, payloadKind, asyncOperation);
+    }
+
+    private async Task<ExtractionResult> CompleteAsyncFileDropAfterOriginalDragAsync(
+        ComTypes.IDataObject dataObject,
+        DragPayloadKind payloadKind,
+        IDataObjectAsyncCapability asyncOperation)
+    {
+        // Returning from IDropTarget.Drop lets Outlook unwind its source drag loop.
+        // Continue on a pool thread only after that loop has had time to finish.
+        await Task.Delay(OriginalDropUnwindDelay).ConfigureAwait(false);
+        return ExtractCore(dataObject, payloadKind, asyncOperation, asyncStarted: true);
+    }
+
+    private ExtractionResult ExtractCore(
+        ComTypes.IDataObject dataObject,
+        DragPayloadKind payloadKind,
+        IDataObjectAsyncCapability? asyncOperation,
+        bool asyncStarted)
+    {
+        string? sessionPath = null;
 
         try
         {
-            if (asyncOperation is not null && asyncOperation.GetAsyncMode(out var asyncMode) == 0 && asyncMode)
-            {
-                var startResult = asyncOperation.StartOperation(null);
-                if (startResult < 0)
-                {
-                    Marshal.ThrowExceptionForHR(startResult);
-                }
-
-                asyncStarted = true;
-            }
-
             if (payloadKind == DragPayloadKind.AsyncFileDrop && !asyncStarted)
             {
                 throw new InvalidOperationException("The delayed file drop could not start its asynchronous operation.");
             }
 
+            sessionPath = _cache.CreateSessionDirectory();
             var outputPaths = payloadKind switch
             {
                 DragPayloadKind.VirtualFileDescriptors => ExtractDescriptors(dataObject, sessionPath),
@@ -109,7 +141,10 @@ internal sealed class VirtualFileExtractor
 
             try
             {
-                Directory.Delete(sessionPath, recursive: true);
+                if (sessionPath is not null)
+                {
+                    Directory.Delete(sessionPath, recursive: true);
+                }
             }
             catch (IOException)
             {

@@ -52,7 +52,13 @@ internal static class Program
                 throw new InvalidOperationException($"Expected an async file drop, received {payloadKind}.");
             }
 
-            var extraction = extractor.Extract(dataObject, payloadKind);
+            var extractionTask = extractor.ExtractAfterDropAsync(dataObject, payloadKind);
+            if (extractionTask.IsCompleted)
+            {
+                throw new InvalidOperationException("Delayed extraction blocked the original Drop callback.");
+            }
+
+            var extraction = extractionTask.GetAwaiter().GetResult();
             if (extraction.Files.Count != 2 ||
                 !File.ReadAllBytes(extraction.Files[0]).SequenceEqual(eml) ||
                 !File.ReadAllBytes(extraction.Files[1]).SequenceEqual(pdf))
@@ -60,7 +66,17 @@ internal static class Program
                 throw new InvalidDataException("The extracted test files did not match the delayed source data.");
             }
 
-            Console.WriteLine("Delayed CF_HDROP self-test passed.");
+            if (!new PhysicalReplayResult(
+                    unchecked((int)NativeMethods.DragDropSDrop),
+                    DragDropEffects.Copy).Accepted ||
+                new PhysicalReplayResult(
+                    unchecked((int)NativeMethods.DragDropSDrop),
+                    DragDropEffects.None).Accepted)
+            {
+                throw new InvalidOperationException("Physical replay result classification was invalid.");
+            }
+
+            Console.WriteLine("Deferred CF_HDROP self-test passed.");
             return 0;
         }
         catch (Exception exception)

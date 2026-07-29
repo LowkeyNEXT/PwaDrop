@@ -11,7 +11,7 @@ PwaDrop is a tray application with three deliberately small layers:
 1. A low-level, same-user mouse hook records a candidate drag only when the source window belongs to `olk.exe` or its WebView2 descendants.
 2. Once the Windows drag threshold is crossed and the cursor leaves Outlook, a non-activating transparent window becomes the OLE target.
 3. The target accepts either asynchronous `CF_HDROP` or `FileGroupDescriptorW` plus indexed `FileContents`; ordinary synchronous file drags are ignored.
-4. On drop, PwaDrop calls `StartOperation`, requests the delayed `CF_HDROP`, and lets Chromium finish its authenticated download. The returned paths are copied in 1 MiB chunks before `EndOperation` allows the source to remove them. Legacy descriptor streams follow the same private-copy path.
+4. On drop, PwaDrop calls `StartOperation` and immediately returns from the original OLE callback. After the Outlook drag loop unwinds, a worker requests the delayed `CF_HDROP` and lets Chromium finish its authenticated download. The returned paths are copied in 1 MiB chunks before `EndOperation` allows the source to remove them. Legacy descriptor streams follow the same private-copy path.
 5. Unsafe path components, reserved DOS names, collisions, and excessive filename lengths are normalized before any file is created.
 6. The transparent window disappears and PwaDrop starts a new OLE operation containing physical `FileDrop` paths. Because the physical mouse button is already released, the replay source completes after the destination's drag-enter negotiation.
 7. The session directory is queued for deletion after 15 minutes. Locked files are retried and abandoned sessions older than 24 hours are purged at startup.
@@ -34,6 +34,7 @@ The relay never synthesizes mouse input and does not inject a DLL into Outlook. 
 - Partial files use a `.partial` suffix and are atomically renamed after complete writes.
 - Web-origin files receive `Zone.Identifier` with `ZoneId=3` when NTFS supports it.
 - Logs and notifications must never contain email subjects, file names, URLs, or content.
+- Diagnostics are limited to payload kind, file count, elapsed time, HRESULT, and drop effect.
 - The project has no network client and no telemetry dependency.
 
 ## Current technical risk
