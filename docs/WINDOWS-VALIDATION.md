@@ -14,7 +14,7 @@ Record results in a pull request before marking an installer as beta. Never test
 
 1. Start PwaDrop and confirm the tray status is **Bridge active**.
 2. Start `PwaDrop.DragHarness`.
-3. Drag the virtual source card onto the physical target card.
+3. Drag the delayed `CF_HDROP` source card onto the physical target card.
 4. Confirm exactly `test-conversation.eml` and `invoice.pdf` appear with non-zero sizes.
 5. Repeat 20 times, including after moving the windows across monitors with different scaling.
 6. Cancel five drags with Escape and confirm no target drop and no stale overlay.

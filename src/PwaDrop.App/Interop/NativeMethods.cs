@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using ComTypes = System.Runtime.InteropServices.ComTypes;
 
 namespace PwaDrop.App.Interop;
@@ -25,6 +26,8 @@ internal static class NativeMethods
     internal const uint TymedHGlobal = 1;
     internal const uint TymedIStream = 4;
     internal const uint DvAspectContent = 1;
+    internal const short CfHDrop = 15;
+    internal const uint DragQueryFileCount = 0xFFFFFFFF;
     internal const uint Th32CsSnapProcess = 0x00000002;
 
     internal delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
@@ -165,6 +168,13 @@ internal static class NativeMethods
 
     [DllImport("ole32.dll")]
     internal static extern void ReleaseStgMedium(ref ComTypes.STGMEDIUM medium);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    internal static extern uint DragQueryFile(
+        IntPtr dropHandle,
+        uint fileIndex,
+        StringBuilder? filePath,
+        uint characterCount);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     internal static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
