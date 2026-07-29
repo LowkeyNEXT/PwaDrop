@@ -26,6 +26,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private SettingsForm? _settingsForm;
     private AppSettings _settings;
     private bool _relayBusy;
+    private DateTimeOffset _lastUnsupportedNotice;
 
     internal PwaDropApplicationContext()
     {
@@ -38,7 +39,11 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         _extractor = new VirtualFileExtractor(_cache);
         _dispatcher = new Control();
         _dispatcher.CreateControl();
-        _overlay = new RelayOverlayForm(_extractor, HandleVirtualDrop, HandleRelayLeave);
+        _overlay = new RelayOverlayForm(
+            _extractor,
+            HandleVirtualDrop,
+            HandleRelayLeave,
+            HandleUnsupportedDrag);
         _ = _overlay.Handle;
         _monitor = new OutlookDragMonitor(_overlay, GetExcludedWindows);
 
@@ -97,7 +102,10 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         return windows;
     }
 
-    private bool HandleVirtualDrop(ComTypes.IDataObject dataObject, NativeMethods.PointL point)
+    private bool HandleVirtualDrop(
+        ComTypes.IDataObject dataObject,
+        NativeMethods.PointL point,
+        DragPayloadKind payloadKind)
     {
         if (_relayBusy)
         {
@@ -109,7 +117,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         try
         {
             SetStatus("Preparing files…");
-            var extraction = _extractor.Extract(dataObject);
+            var extraction = _extractor.Extract(dataObject, payloadKind);
             _dispatcher.BeginInvoke(() => ReplayExtraction(extraction));
             return true;
         }
@@ -154,6 +162,28 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         {
             _overlay.HideRelay();
         }
+    }
+
+    private void HandleUnsupportedDrag()
+    {
+        _dispatcher.BeginInvoke(() =>
+        {
+            _overlay.HideRelay();
+            SetStatus(_settings.Enabled ? "Bridge active" : "Bridge paused");
+
+            var now = DateTimeOffset.UtcNow;
+            if (now - _lastUnsupportedNotice < TimeSpan.FromSeconds(10))
+            {
+                return;
+            }
+
+            _lastUnsupportedNotice = now;
+            _trayIcon.ShowBalloonTip(
+                3500,
+                "PwaDrop",
+                "That Outlook drag did not expose a downloadable file. Try an email row or attachment.",
+                ToolTipIcon.Info);
+        });
     }
 
     private void ApplySettings(AppSettings settings, bool persist = true)

@@ -20,55 +20,79 @@ internal sealed class VirtualFileExtractor
         _contentsFormat = unchecked((short)NativeMethods.RegisterClipboardFormat("FileContents"));
     }
 
-    internal bool CanExtract(ComTypes.IDataObject dataObject)
+    internal DragPayloadKind DetectPayload(ComTypes.IDataObject dataObject)
     {
-        var format = CreateFormat(_descriptorFormat, -1, NativeMethods.TymedHGlobal);
-        return dataObject.QueryGetData(ref format) == 0;
+        var descriptor = CreateFormat(_descriptorFormat, -1, NativeMethods.TymedHGlobal);
+        if (dataObject.QueryGetData(ref descriptor) == 0)
+        {
+            return DragPayloadKind.VirtualFileDescriptors;
+        }
+
+        var fileDrop = CreateFormat(NativeMethods.CfHDrop, -1, NativeMethods.TymedHGlobal);
+        if (dataObject.QueryGetData(ref fileDrop) != 0)
+        {
+            return DragPayloadKind.Unsupported;
+        }
+
+        var asyncOperation = GetAsyncCapability(dataObject);
+        try
+        {
+            return asyncOperation is not null &&
+                   asyncOperation.GetAsyncMode(out var asyncMode) == 0 &&
+                   asyncMode
+                ? DragPayloadKind.AsyncFileDrop
+                : DragPayloadKind.Unsupported;
+        }
+        catch (COMException)
+        {
+            return DragPayloadKind.Unsupported;
+        }
     }
 
-    internal ExtractionResult Extract(ComTypes.IDataObject dataObject)
+    internal ExtractionResult Extract(ComTypes.IDataObject dataObject, DragPayloadKind payloadKind)
     {
-        var descriptors = ReadDescriptors(dataObject);
-        if (descriptors.Count == 0)
+        if (payloadKind == DragPayloadKind.Unsupported)
         {
-            throw new InvalidDataException("The drag did not contain any virtual files.");
+            throw new NotSupportedException("The drag did not contain a supported virtual-file payload.");
         }
 
         var sessionPath = _cache.CreateSessionDirectory();
-        var outputPaths = new List<string>(descriptors.Count);
-        var claimedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var asyncOperation = dataObject as IDataObjectAsyncCapability;
+        var asyncOperation = GetAsyncCapability(dataObject);
         var asyncStarted = false;
 
         try
         {
             if (asyncOperation is not null && asyncOperation.GetAsyncMode(out var asyncMode) == 0 && asyncMode)
             {
-                asyncStarted = asyncOperation.StartOperation(null) == 0;
-            }
-
-            foreach (var descriptor in descriptors)
-            {
-                var safeName = FileNameSanitizer.Sanitize(descriptor.DisplayName, descriptor.Index);
-                safeName = FileNameSanitizer.MakeUnique(safeName, claimedNames);
-                var finalPath = Path.Combine(sessionPath, safeName);
-                var partialPath = finalPath + ".partial";
-
-                WriteFileContents(dataObject, descriptor.Index, partialPath);
-                File.Move(partialPath, finalPath);
-                ApplyInternetZoneMarker(finalPath);
-
-                if (descriptor.LastWriteTime is { } lastWrite)
+                var startResult = asyncOperation.StartOperation(null);
+                if (startResult < 0)
                 {
-                    File.SetLastWriteTimeUtc(finalPath, lastWrite.UtcDateTime);
+                    Marshal.ThrowExceptionForHR(startResult);
                 }
 
-                outputPaths.Add(finalPath);
+                asyncStarted = true;
             }
+
+            if (payloadKind == DragPayloadKind.AsyncFileDrop && !asyncStarted)
+            {
+                throw new InvalidOperationException("The delayed file drop could not start its asynchronous operation.");
+            }
+
+            var outputPaths = payloadKind switch
+            {
+                DragPayloadKind.VirtualFileDescriptors => ExtractDescriptors(dataObject, sessionPath),
+                DragPayloadKind.AsyncFileDrop => ExtractFileDrop(dataObject, sessionPath),
+                _ => throw new NotSupportedException("The drag payload was not supported.")
+            };
 
             if (asyncStarted)
             {
-                asyncOperation!.EndOperation(0, null, NativeMethods.DropEffectCopy);
+                var endResult = asyncOperation!.EndOperation(0, null, NativeMethods.DropEffectCopy);
+                asyncStarted = false;
+                if (endResult < 0)
+                {
+                    Marshal.ThrowExceptionForHR(endResult);
+                }
             }
 
             return new ExtractionResult(sessionPath, outputPaths);
@@ -77,7 +101,10 @@ internal sealed class VirtualFileExtractor
         {
             if (asyncStarted)
             {
-                asyncOperation!.EndOperation(Marshal.GetHRForException(exception), null, NativeMethods.DropEffectNone);
+                _ = asyncOperation!.EndOperation(
+                    Marshal.GetHRForException(exception),
+                    null,
+                    NativeMethods.DropEffectNone);
             }
 
             try
@@ -90,6 +117,155 @@ internal sealed class VirtualFileExtractor
             }
 
             throw;
+        }
+    }
+
+    private IReadOnlyList<string> ExtractDescriptors(ComTypes.IDataObject dataObject, string sessionPath)
+    {
+        var descriptors = ReadDescriptors(dataObject);
+        if (descriptors.Count == 0)
+        {
+            throw new InvalidDataException("The drag did not contain any virtual files.");
+        }
+
+        var outputPaths = new List<string>(descriptors.Count);
+        var claimedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var descriptor in descriptors)
+        {
+            var safeName = FileNameSanitizer.Sanitize(descriptor.DisplayName, descriptor.Index);
+            safeName = FileNameSanitizer.MakeUnique(safeName, claimedNames);
+            var finalPath = Path.Combine(sessionPath, safeName);
+            var partialPath = finalPath + ".partial";
+
+            WriteFileContents(dataObject, descriptor.Index, partialPath);
+            File.Move(partialPath, finalPath);
+            ApplyInternetZoneMarker(finalPath);
+
+            if (descriptor.LastWriteTime is { } lastWrite)
+            {
+                File.SetLastWriteTimeUtc(finalPath, lastWrite.UtcDateTime);
+            }
+
+            outputPaths.Add(finalPath);
+        }
+
+        return outputPaths;
+    }
+
+    private IReadOnlyList<string> ExtractFileDrop(ComTypes.IDataObject dataObject, string sessionPath)
+    {
+        var sourcePaths = ReadFileDropPaths(dataObject);
+        if (sourcePaths.Count == 0)
+        {
+            throw new InvalidDataException("The delayed file drop did not produce any files.");
+        }
+
+        var outputPaths = new List<string>(sourcePaths.Count);
+        var claimedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < sourcePaths.Count; index++)
+        {
+            var sourcePath = sourcePaths[index];
+            if (!Path.IsPathFullyQualified(sourcePath) || !File.Exists(sourcePath))
+            {
+                throw new InvalidDataException("The delayed file drop returned an unavailable path.");
+            }
+
+            var safeName = FileNameSanitizer.Sanitize(Path.GetFileName(sourcePath), index);
+            safeName = FileNameSanitizer.MakeUnique(safeName, claimedNames);
+            var finalPath = Path.Combine(sessionPath, safeName);
+            var partialPath = finalPath + ".partial";
+            var lastWriteTime = File.GetLastWriteTimeUtc(sourcePath);
+
+            CopyPhysicalFile(sourcePath, partialPath);
+            File.Move(partialPath, finalPath);
+            ApplyInternetZoneMarker(finalPath);
+            File.SetLastWriteTimeUtc(finalPath, lastWriteTime);
+            outputPaths.Add(finalPath);
+        }
+
+        return outputPaths;
+    }
+
+    private static IReadOnlyList<string> ReadFileDropPaths(ComTypes.IDataObject dataObject)
+    {
+        var format = CreateFormat(NativeMethods.CfHDrop, -1, NativeMethods.TymedHGlobal);
+        dataObject.GetData(ref format, out var medium);
+
+        try
+        {
+            if ((uint)medium.tymed != NativeMethods.TymedHGlobal || medium.unionmember == IntPtr.Zero)
+            {
+                throw new InvalidDataException("CF_HDROP was not provided as global memory.");
+            }
+
+            var count = NativeMethods.DragQueryFile(
+                medium.unionmember,
+                NativeMethods.DragQueryFileCount,
+                null,
+                0);
+            if (count > 10_000)
+            {
+                throw new InvalidDataException("The delayed file-drop count was invalid.");
+            }
+
+            var paths = new List<string>(checked((int)count));
+            for (uint index = 0; index < count; index++)
+            {
+                var length = NativeMethods.DragQueryFile(medium.unionmember, index, null, 0);
+                if (length == 0 || length >= short.MaxValue)
+                {
+                    throw new InvalidDataException("A delayed file-drop path was invalid.");
+                }
+
+                var path = new System.Text.StringBuilder(checked((int)length + 1));
+                if (NativeMethods.DragQueryFile(medium.unionmember, index, path, length + 1) == 0)
+                {
+                    throw new InvalidDataException("A delayed file-drop path could not be read.");
+                }
+
+                paths.Add(path.ToString());
+            }
+
+            return paths;
+        }
+        finally
+        {
+            NativeMethods.ReleaseStgMedium(ref medium);
+        }
+    }
+
+    private static void CopyPhysicalFile(string sourcePath, string outputPath)
+    {
+        using var source = new FileStream(
+            sourcePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read | FileShare.Delete,
+            1024 * 1024,
+            FileOptions.SequentialScan);
+        using var output = new FileStream(
+            outputPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            1024 * 1024,
+            FileOptions.SequentialScan);
+        source.CopyTo(output, 1024 * 1024);
+    }
+
+    private static IDataObjectAsyncCapability? GetAsyncCapability(ComTypes.IDataObject dataObject)
+    {
+        try
+        {
+            return dataObject as IDataObjectAsyncCapability;
+        }
+        catch (COMException)
+        {
+            return null;
+        }
+        catch (InvalidCastException)
+        {
+            return null;
         }
     }
 
@@ -307,3 +483,10 @@ internal sealed class VirtualFileExtractor
 }
 
 internal sealed record ExtractionResult(string SessionPath, IReadOnlyList<string> Files);
+
+internal enum DragPayloadKind
+{
+    Unsupported,
+    VirtualFileDescriptors,
+    AsyncFileDrop
+}

@@ -10,8 +10,7 @@ Do not open a public issue for a vulnerability that could expose file contents, 
 
 - PwaDrop runs at the current user's integrity level and does not request elevation.
 - It does not authenticate to Microsoft 365, read browser cookies, or send telemetry.
-- It accepts only Windows Shell virtual-file data objects from the recognized New Outlook process tree.
+- It accepts only asynchronous `CF_HDROP` or Windows Shell virtual-file data objects from the recognized New Outlook process tree. Ordinary synchronous path drags are passed through.
 - Temporary paths are generated under the current user's local application data directory.
 - Web-origin files receive a `Zone.Identifier` marker when the filesystem supports alternate data streams.
 - PwaDrop does not attempt to bridge into elevated target applications.
-

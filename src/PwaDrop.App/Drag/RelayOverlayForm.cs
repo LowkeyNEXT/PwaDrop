@@ -11,10 +11,11 @@ internal sealed class RelayOverlayForm : Form
 
     internal RelayOverlayForm(
         VirtualFileExtractor extractor,
-        Func<ComTypes.IDataObject, NativeMethods.PointL, bool> drop,
-        Action leave)
+        Func<ComTypes.IDataObject, NativeMethods.PointL, DragPayloadKind, bool> drop,
+        Action leave,
+        Action unsupported)
     {
-        _dropTarget = new OleRelayDropTarget(extractor, drop, leave);
+        _dropTarget = new OleRelayDropTarget(extractor, drop, leave, unsupported);
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         TopMost = true;

@@ -4,14 +4,14 @@ PwaDrop is a tray application with three deliberately small layers:
 
 - `PwaDrop.Core` owns filename safety, settings, and cache lifecycle without Windows dependencies.
 - `PwaDrop.App` owns source detection, OLE interop, virtual-file materialization, replay, tray UI, and settings.
-- `PwaDrop.DragHarness` produces the same documented virtual-file formats and provides a target that accepts only `FileDrop` paths.
+- `PwaDrop.DragHarness` produces Chromium-style delayed `CF_HDROP` and provides a target that accepts only `FileDrop` paths.
 
 ## Relay lifecycle
 
 1. A low-level, same-user mouse hook records a candidate drag only when the source window belongs to `olk.exe` or its WebView2 descendants.
 2. Once the Windows drag threshold is crossed and the cursor leaves Outlook, a non-activating transparent window becomes the OLE target.
-3. The target accepts only `FileGroupDescriptorW` plus indexed `FileContents`; ordinary file drags are ignored.
-4. On drop, file descriptors are validated and each `IStream` or `HGLOBAL` is copied in 1 MiB chunks to a random session directory.
+3. The target accepts either asynchronous `CF_HDROP` or `FileGroupDescriptorW` plus indexed `FileContents`; ordinary synchronous file drags are ignored.
+4. On drop, PwaDrop calls `StartOperation`, requests the delayed `CF_HDROP`, and lets Chromium finish its authenticated download. The returned paths are copied in 1 MiB chunks before `EndOperation` allows the source to remove them. Legacy descriptor streams follow the same private-copy path.
 5. Unsafe path components, reserved DOS names, collisions, and excessive filename lengths are normalized before any file is created.
 6. The transparent window disappears and PwaDrop starts a new OLE operation containing physical `FileDrop` paths. Because the physical mouse button is already released, the replay source completes after the destination's drag-enter negotiation.
 7. The session directory is queued for deletion after 15 minutes. Locked files are retried and abandoned sessions older than 24 hours are purged at startup.
@@ -22,8 +22,8 @@ The relay never synthesizes mouse input and does not inject a DLL into Outlook. 
 
 - The app runs in an STA and explicitly initializes OLE.
 - Every `STGMEDIUM` returned by the source is released with `ReleaseStgMedium`.
-- Virtual streams are copied sequentially and never buffered as complete files.
-- The test harness allocates movable global descriptor blocks and exposes content through COM `IStream` objects.
+- Virtual streams and delayed physical sources are copied sequentially and never buffered as complete files.
+- The test harness implements `IDataObjectAsyncCapability`, refuses early data requests, and allocates a movable `DROPFILES` block only after `StartOperation`.
 - No COM pointer is persisted after the original drop callback returns.
 
 ## Security invariants
@@ -46,4 +46,3 @@ Primary platform references:
 - [Shell clipboard formats](https://learn.microsoft.com/en-us/windows/win32/shell/clipboard)
 - [IDataObjectAsyncCapability](https://learn.microsoft.com/en-us/windows/win32/api/shldisp/nn-shldisp-idataobjectasynccapability)
 - [New Outlook architecture](https://learn.microsoft.com/en-us/microsoft-365-apps/outlook/overview-new-outlook-windows)
-

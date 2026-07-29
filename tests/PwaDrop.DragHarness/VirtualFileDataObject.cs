@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 using PwaDrop.App.Interop;
 using ComTypes = System.Runtime.InteropServices.ComTypes;
 
@@ -6,64 +7,49 @@ namespace PwaDrop.DragHarness;
 
 [ComVisible(true)]
 [ClassInterface(ClassInterfaceType.None)]
-internal sealed class VirtualFileDataObject : ComTypes.IDataObject
+internal sealed class VirtualFileDataObject :
+    ComTypes.IDataObject,
+    IDataObjectAsyncCapability,
+    IDisposable
 {
     private const uint GmemMoveableAndZeroInit = 0x0042;
-    private const uint FileDescriptorFlags = 0x00000044;
+    private const int DropFilesHeaderSize = 20;
     private readonly IReadOnlyList<VirtualTestFile> _files;
-    private readonly short _descriptorFormat;
-    private readonly short _contentsFormat;
+    private string? _temporaryDirectory;
+    private IReadOnlyList<string>? _temporaryPaths;
+    private bool _asyncMode = true;
+    private bool _inOperation;
 
     internal VirtualFileDataObject(params VirtualTestFile[] files)
     {
         _files = files;
-        _descriptorFormat = unchecked((short)NativeMethods.RegisterClipboardFormat("FileGroupDescriptorW"));
-        _contentsFormat = unchecked((short)NativeMethods.RegisterClipboardFormat("FileContents"));
     }
 
     public void GetData(ref ComTypes.FORMATETC format, out ComTypes.STGMEDIUM medium)
     {
-        if (format.cfFormat == _descriptorFormat)
+        if (format.cfFormat != NativeMethods.CfHDrop ||
+            (format.tymed & ComTypes.TYMED.TYMED_HGLOBAL) == 0)
         {
-            medium = CreateDescriptors();
-            return;
+            throw new COMException("Unsupported format.", unchecked((int)0x80040064));
         }
 
-        if (format.cfFormat == _contentsFormat && format.lindex >= 0 && format.lindex < _files.Count)
+        if (!_inOperation)
         {
-            var stream = new ManagedComStream(_files[format.lindex].Contents);
-            medium = new ComTypes.STGMEDIUM
-            {
-                tymed = ComTypes.TYMED.TYMED_ISTREAM,
-                unionmember = Marshal.GetComInterfaceForObject<ManagedComStream, ComTypes.IStream>(stream),
-                pUnkForRelease = null
-            };
-            return;
+            throw new COMException("The delayed download has not started.", unchecked((int)0x8000000A));
         }
 
-        throw new COMException("Unsupported format.", unchecked((int)0x80040064));
+        var paths = MaterializeTemporaryFiles();
+        medium = CreateFileDrop(paths);
     }
 
     public void GetDataHere(ref ComTypes.FORMATETC format, ref ComTypes.STGMEDIUM medium) =>
         throw new COMException("GetDataHere is not supported.", unchecked((int)0x80004001));
 
-    public int QueryGetData(ref ComTypes.FORMATETC format)
-    {
-        if (format.cfFormat == _descriptorFormat && (format.tymed & ComTypes.TYMED.TYMED_HGLOBAL) != 0)
-        {
-            return 0;
-        }
-
-        if (format.cfFormat == _contentsFormat &&
-            format.lindex >= 0 &&
-            format.lindex < _files.Count &&
-            (format.tymed & ComTypes.TYMED.TYMED_ISTREAM) != 0)
-        {
-            return 0;
-        }
-
-        return unchecked((int)0x80040064);
-    }
+    public int QueryGetData(ref ComTypes.FORMATETC format) =>
+        format.cfFormat == NativeMethods.CfHDrop &&
+        (format.tymed & ComTypes.TYMED.TYMED_HGLOBAL) != 0
+            ? 0
+            : unchecked((int)0x80040064);
 
     public int GetCanonicalFormatEtc(ref ComTypes.FORMATETC formatIn, out ComTypes.FORMATETC formatOut)
     {
@@ -82,18 +68,21 @@ internal sealed class VirtualFileDataObject : ComTypes.IDataObject
             throw new COMException("Only DATADIR_GET is supported.", unchecked((int)0x80004001));
         }
 
-        return new FormatEnumerator(
-            CreateFormat(_descriptorFormat, -1, ComTypes.TYMED.TYMED_HGLOBAL),
-            CreateFormat(_contentsFormat, 0, ComTypes.TYMED.TYMED_ISTREAM));
+        return new FormatEnumerator(CreateFormat());
     }
 
-    public int DAdvise(ref ComTypes.FORMATETC format, ComTypes.ADVF advf, ComTypes.IAdviseSink adviseSink, out int connection)
+    public int DAdvise(
+        ref ComTypes.FORMATETC format,
+        ComTypes.ADVF advf,
+        ComTypes.IAdviseSink adviseSink,
+        out int connection)
     {
         connection = 0;
         return unchecked((int)0x80040003);
     }
 
-    public void DUnadvise(int connection) => throw new COMException("Advisories are not supported.", unchecked((int)0x80040003));
+    public void DUnadvise(int connection) =>
+        throw new COMException("Advisories are not supported.", unchecked((int)0x80040003));
 
     public int EnumDAdvise(out ComTypes.IEnumSTATDATA? enumAdvise)
     {
@@ -101,10 +90,96 @@ internal sealed class VirtualFileDataObject : ComTypes.IDataObject
         return unchecked((int)0x80040003);
     }
 
-    private ComTypes.STGMEDIUM CreateDescriptors()
+    public int SetAsyncMode(bool asyncMode)
     {
-        var descriptorSize = Marshal.SizeOf<FileDescriptorW>();
-        var totalSize = sizeof(uint) + (_files.Count * descriptorSize);
+        _asyncMode = asyncMode;
+        return 0;
+    }
+
+    public int GetAsyncMode(out bool asyncMode)
+    {
+        asyncMode = _asyncMode;
+        return 0;
+    }
+
+    public int StartOperation(object? reserved)
+    {
+        if (!_asyncMode)
+        {
+            return unchecked((int)0x8000FFFF);
+        }
+
+        _inOperation = true;
+        return 0;
+    }
+
+    public int InOperation(out bool inAsyncOperation)
+    {
+        inAsyncOperation = _inOperation;
+        return 0;
+    }
+
+    public int EndOperation(int result, object? reserved, uint effects)
+    {
+        _inOperation = false;
+        return 0;
+    }
+
+    public void Dispose()
+    {
+        if (_temporaryDirectory is not null)
+        {
+            try
+            {
+                Directory.Delete(_temporaryDirectory, recursive: true);
+            }
+            catch (IOException)
+            {
+                // The harness will retry on its next cleanup cycle.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // A destination may still have a test file open briefly.
+            }
+        }
+
+        GC.SuppressFinalize(this);
+    }
+
+    private IReadOnlyList<string> MaterializeTemporaryFiles()
+    {
+        if (_temporaryPaths is not null)
+        {
+            return _temporaryPaths;
+        }
+
+        // Chromium starts the download from GetData after StartOperation. A short
+        // pause makes the harness catch receivers that incorrectly request data
+        // during DragEnter instead of waiting for Drop.
+        Thread.Sleep(250);
+        _temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "PwaDrop.DragHarness",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_temporaryDirectory);
+
+        var paths = new List<string>(_files.Count);
+        foreach (var file in _files)
+        {
+            var path = Path.Combine(_temporaryDirectory, Path.GetFileName(file.Name));
+            File.WriteAllBytes(path, file.Contents);
+            paths.Add(path);
+        }
+
+        _temporaryPaths = paths;
+        return paths;
+    }
+
+    private static ComTypes.STGMEDIUM CreateFileDrop(IReadOnlyList<string> paths)
+    {
+        var pathList = string.Join('\0', paths) + "\0\0";
+        var pathBytes = Encoding.Unicode.GetBytes(pathList);
+        var totalSize = checked(DropFilesHeaderSize + pathBytes.Length);
         var global = NativeMethods.GlobalAlloc(GmemMoveableAndZeroInit, (UIntPtr)(uint)totalSize);
         if (global == IntPtr.Zero)
         {
@@ -119,21 +194,9 @@ internal sealed class VirtualFileDataObject : ComTypes.IDataObject
 
         try
         {
-            Marshal.WriteInt32(memory, _files.Count);
-            for (var index = 0; index < _files.Count; index++)
-            {
-                var file = _files[index];
-                var descriptor = new FileDescriptorW
-                {
-                    Flags = FileDescriptorFlags,
-                    FileAttributes = 0x00000080,
-                    LastWriteTime = DateTime.UtcNow.ToFileTimeUtc(),
-                    FileSizeHigh = (uint)((ulong)file.Contents.LongLength >> 32),
-                    FileSizeLow = (uint)file.Contents.LongLength,
-                    FileName = file.Name
-                };
-                Marshal.StructureToPtr(descriptor, IntPtr.Add(memory, sizeof(uint) + (index * descriptorSize)), false);
-            }
+            Marshal.WriteInt32(memory, 0, DropFilesHeaderSize);
+            Marshal.WriteInt32(memory, 16, 1);
+            Marshal.Copy(pathBytes, 0, IntPtr.Add(memory, DropFilesHeaderSize), pathBytes.Length);
         }
         finally
         {
@@ -148,47 +211,14 @@ internal sealed class VirtualFileDataObject : ComTypes.IDataObject
         };
     }
 
-    private static ComTypes.FORMATETC CreateFormat(short format, int index, ComTypes.TYMED medium) => new()
+    private static ComTypes.FORMATETC CreateFormat() => new()
     {
-        cfFormat = format,
+        cfFormat = NativeMethods.CfHDrop,
         dwAspect = ComTypes.DVASPECT.DVASPECT_CONTENT,
-        lindex = index,
+        lindex = -1,
         ptd = IntPtr.Zero,
-        tymed = medium
+        tymed = ComTypes.TYMED.TYMED_HGLOBAL
     };
-
-    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-    private struct FileDescriptorW
-    {
-        internal uint Flags;
-        internal Guid ClassId;
-        internal SizeL Size;
-        internal PointL Point;
-        internal uint FileAttributes;
-        internal long CreationTime;
-        internal long LastAccessTime;
-        internal long LastWriteTime;
-        internal uint FileSizeHigh;
-        internal uint FileSizeLow;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
-        internal string FileName;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct SizeL
-    {
-        internal int Width;
-        internal int Height;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PointL
-    {
-        internal int X;
-        internal int Y;
-    }
 }
 
 internal sealed record VirtualTestFile(string Name, byte[] Contents);
-
