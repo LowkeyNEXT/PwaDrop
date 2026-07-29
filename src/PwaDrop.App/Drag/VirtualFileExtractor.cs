@@ -236,7 +236,7 @@ internal sealed class VirtualFileExtractor
             while (remaining > 0)
             {
                 var count = (int)Math.Min(buffer.Length, remaining);
-                Marshal.Copy(IntPtr.Add(memory, checked((int)offset)), buffer, 0, count);
+                Marshal.Copy(new IntPtr(memory.ToInt64() + offset), buffer, 0, count);
                 output.Write(buffer, 0, count);
                 offset += count;
                 remaining -= count;
@@ -307,4 +307,3 @@ internal sealed class VirtualFileExtractor
 }
 
 internal sealed record ExtractionResult(string SessionPath, IReadOnlyList<string> Files);
-

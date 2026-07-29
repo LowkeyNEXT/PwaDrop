@@ -170,6 +170,9 @@ internal static class NativeMethods
     internal static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint processId);
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr GetModuleHandle(string? moduleName);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool Process32First(IntPtr snapshot, ref ProcessEntry32 entry);
 

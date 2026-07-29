@@ -25,8 +25,6 @@ internal sealed class SettingsForm : Form
         Font = new Font("Segoe UI Variable Text", 10f);
 
         var header = new BrandHeader { Dock = DockStyle.Top, Height = 132 };
-        Controls.Add(header);
-
         var content = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -40,7 +38,8 @@ internal sealed class SettingsForm : Form
         content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         content.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
         Controls.Add(content);
-        content.BringToFront();
+        Controls.Add(header);
+        header.BringToFront();
 
         _enabledToggle = CreateToggle("Enable drag bridge", "Convert New Outlook virtual files into normal Windows file drops.");
         _startupToggle = CreateToggle("Start with Windows", "Keep PwaDrop ready in the notification area after sign-in.");
@@ -91,8 +90,7 @@ internal sealed class SettingsForm : Form
             Font = new Font(Font, FontStyle.Bold)
         };
         var close = CreateButton("Done", (_, _) => Hide());
-        close.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        close.Location = new Point(500, 8);
+        close.Dock = DockStyle.Right;
         footer.Controls.Add(_status);
         footer.Controls.Add(close);
         content.Controls.Add(footer, 0, 3);
@@ -214,4 +212,3 @@ internal sealed class SettingsForm : Form
         }
     }
 }
-

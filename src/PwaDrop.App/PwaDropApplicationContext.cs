@@ -97,11 +97,11 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         return windows;
     }
 
-    private void HandleVirtualDrop(ComTypes.IDataObject dataObject, NativeMethods.PointL point)
+    private bool HandleVirtualDrop(ComTypes.IDataObject dataObject, NativeMethods.PointL point)
     {
         if (_relayBusy)
         {
-            return;
+            return false;
         }
 
         _relayBusy = true;
@@ -111,12 +111,14 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
             SetStatus("Preparing files…");
             var extraction = _extractor.Extract(dataObject);
             _dispatcher.BeginInvoke(() => ReplayExtraction(extraction));
+            return true;
         }
         catch (Exception exception)
         {
             _relayBusy = false;
             SetStatus("Bridge active");
             ShowError("PwaDrop could not prepare that item.", exception.HResult);
+            return false;
         }
     }
 
@@ -157,8 +159,6 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private void ApplySettings(AppSettings settings, bool persist = true)
     {
         _settings = settings;
-        _enabledMenuItem.Checked = settings.Enabled;
-        _enabledMenuItem.Text = settings.Enabled ? "Bridge enabled" : "Bridge paused";
 
         if (settings.Enabled && !_monitor.IsRunning)
         {
@@ -177,6 +177,8 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
             _monitor.Stop();
         }
 
+        _enabledMenuItem.Checked = _settings.Enabled;
+        _enabledMenuItem.Text = _settings.Enabled ? "Bridge enabled" : "Bridge paused";
         ConfigureStartup(_settings.StartWithWindows);
         _settingsForm?.ApplySettings(_settings);
         SetStatus(_settings.Enabled ? "Bridge active" : "Bridge paused");
@@ -249,4 +251,3 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         ExitThread();
     }
 }
-

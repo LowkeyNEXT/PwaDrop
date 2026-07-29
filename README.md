@@ -66,6 +66,8 @@ dotnet run --project .\tests\PwaDrop.DragHarness\PwaDrop.DragHarness.csproj
 
 Drag the harness's **DRAG FROM HERE** card onto **DROP HERE**. The source intentionally provides only virtual files and the target intentionally accepts only physical paths, so a successful two-file result exercises the complete relay.
 
+For a browser destination, open [`tests/browser-drop-target/index.html`](tests/browser-drop-target/index.html) in Edge or Chrome and drag the harness source onto its drop zone.
+
 ### Build an MSIX
 
 ```powershell
@@ -87,4 +89,3 @@ The MVP supports the installed New Outlook app on Windows 11 x64. Outlook on the
 
 
 Licensed under the [MIT License](LICENSE).
-

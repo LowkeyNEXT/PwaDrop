@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PwaDrop browser target</title>
+  <style>
+    :root { color-scheme: dark; font-family: "Segoe UI Variable", "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #101426; color: white; }
+    main { width: min(760px, calc(100vw - 48px)); }
+    h1 { font-size: 36px; margin-bottom: 8px; }
+    p { color: #aeb7d4; }
+    #drop-zone { margin-top: 32px; min-height: 260px; display: grid; place-items: center; padding: 32px; text-align: center; border: 2px dashed #7182ff; border-radius: 24px; background: linear-gradient(135deg, #1b2345, #241c45); transition: 120ms ease; }
+    #drop-zone.active { border-color: #62e5c2; background: #173a38; transform: scale(1.01); }
+    #files { margin-top: 24px; padding: 0; list-style: none; }
+    #files li { margin-top: 8px; padding: 12px 16px; border-radius: 10px; background: #1b2345; }
+    code { color: #8fa0ff; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>PwaDrop browser target</h1>
+    <p>This page uses only the standard HTML drag-and-drop API. A successful relay arrives as ordinary <code>File</code> objects.</p>
+    <section id="drop-zone" aria-label="File drop zone">
+      <strong>Drop virtual Outlook or harness files here</strong>
+    </section>
+    <ul id="files" aria-live="polite"></ul>
+  </main>
+  <script>
+    const zone = document.querySelector('#drop-zone');
+    const list = document.querySelector('#files');
+    for (const eventName of ['dragenter', 'dragover']) {
+      zone.addEventListener(eventName, event => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+        zone.classList.add('active');
+      });
+    }
+    for (const eventName of ['dragleave', 'drop']) {
+      zone.addEventListener(eventName, event => {
+        event.preventDefault();
+        zone.classList.remove('active');
+      });
+    }
+    zone.addEventListener('drop', event => {
+      list.replaceChildren(...Array.from(event.dataTransfer.files, file => {
+        const item = document.createElement('li');
+        item.textContent = `${file.name} — ${file.size.toLocaleString()} bytes — ${file.type || 'unknown MIME type'}`;
+        return item;
+      }));
+    });
+  </script>
+</body>
+</html>
