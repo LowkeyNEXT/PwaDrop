@@ -6,6 +6,8 @@ obj/
 TestResults/
 artifacts/
 publish/
+/outputs/
+/work/
 *.user
 *.suo
 *.pfx
@@ -15,4 +17,3 @@ publish/
 *.msixbundle
 *.appinstaller
 .DS_Store
-
