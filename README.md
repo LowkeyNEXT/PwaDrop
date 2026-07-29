@@ -9,7 +9,7 @@
 PwaDrop is an open-source Windows utility that turns New Outlook's asynchronous virtual files into normal file drops. It is designed for the missing workflow where an email or attachment can be dragged to File Explorer, but not directly into a browser upload target, a ServiceNow ticket, or another Windows application.
 
 > [!IMPORTANT]
-> This repository contains a cross-compiling MVP and a purpose-built Windows drag harness. Alpha 2 fixes the delayed `CF_HDROP` format observed in New Outlook, but still needs the complete [Windows validation matrix](docs/WINDOWS-VALIDATION.md) before it should be treated as a beta.
+> This repository contains a cross-compiling MVP and a purpose-built Windows drag harness. Alpha 3 moves delayed Outlook materialization out of the original OLE callback and waits for that drag loop to unwind before replay. It still needs the complete [Windows validation matrix](docs/WINDOWS-VALIDATION.md) before it should be treated as a beta.
 
 ## MVP behavior
 
@@ -20,6 +20,7 @@ PwaDrop is an open-source Windows utility that turns New Outlook's asynchronous 
 - Preserves `.eml` messages and original attachment names.
 - Marks web-origin files with Mark of the Web and removes temporary sessions after a grace period.
 - Uses no Graph permissions, Outlook add-in, browser extension, mailbox login, or telemetry.
+- Records only redacted payload type, timing, file count, and OLE result diagnostics under `%LOCALAPPDATA%\PwaDrop`.
 
 ## How it works
 
@@ -32,6 +33,7 @@ sequenceDiagram
 
     O->>R: Delayed CF_HDROP drag
     R->>O: StartOperation after Drop
+    R-->>O: Return from original Drop
     O-->>R: Authenticated temporary paths
     R->>C: Copy to random private paths
     R->>T: Replay as CF_HDROP files
@@ -54,7 +56,7 @@ Requirements:
 dotnet run --project .\src\PwaDrop.App\PwaDrop.App.csproj
 ```
 
-PwaDrop starts in the notification area. Double-click its icon to open settings.
+PwaDrop starts in the notification area. Double-click its icon to open settings. Use **Open diagnostics** from the tray menu to inspect redacted extraction timing and the final OLE replay result.
 
 ### Test without Outlook
 

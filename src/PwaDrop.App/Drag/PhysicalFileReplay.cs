@@ -6,7 +6,7 @@ namespace PwaDrop.App.Drag;
 
 internal static class PhysicalFileReplay
 {
-    internal static DragDropEffects Replay(IReadOnlyList<string> files)
+    internal static PhysicalReplayResult Replay(IReadOnlyList<string> files)
     {
         var dataObject = new DataObject();
         dataObject.SetData(DataFormats.FileDrop, autoConvert: true, files.ToArray());
@@ -17,9 +17,7 @@ internal static class PhysicalFileReplay
             NativeMethods.DropEffectCopy,
             out var effect);
 
-        return result == 0 || unchecked((uint)result) == NativeMethods.DragDropSDrop
-            ? (DragDropEffects)effect
-            : DragDropEffects.None;
+        return new PhysicalReplayResult(result, (DragDropEffects)effect);
     }
 
     [ComVisible(true)]
@@ -42,3 +40,9 @@ internal static class PhysicalFileReplay
     }
 }
 
+internal readonly record struct PhysicalReplayResult(int HResult, DragDropEffects Effect)
+{
+    internal bool Accepted =>
+        (HResult == 0 || unchecked((uint)HResult) == NativeMethods.DragDropSDrop) &&
+        (Effect & DragDropEffects.Copy) == DragDropEffects.Copy;
+}
