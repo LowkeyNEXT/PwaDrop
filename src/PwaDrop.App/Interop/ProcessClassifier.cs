@@ -24,6 +24,30 @@ internal static class ProcessClassifier
             return false;
         }
 
+        string directName;
+        try
+        {
+            directName = Process.GetProcessById((int)processId).ProcessName;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+
+        if (IsOutlookExecutable(directName))
+        {
+            return true;
+        }
+
+        if (!directName.Equals("msedgewebview2", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         var processNames = SnapshotProcessTree();
         var current = processId;
         for (var depth = 0; depth < 8 && current != 0; depth++)
@@ -34,9 +58,7 @@ internal static class ProcessClassifier
             }
 
             var name = Path.GetFileNameWithoutExtension(process.Executable);
-            if (name.Equals("olk", StringComparison.OrdinalIgnoreCase) ||
-                name.Equals("Microsoft.OutlookForWindows", StringComparison.OrdinalIgnoreCase) ||
-                name.Equals("PwaDrop.DragHarness", StringComparison.OrdinalIgnoreCase))
+            if (IsOutlookExecutable(name))
             {
                 return true;
             }
@@ -44,19 +66,13 @@ internal static class ProcessClassifier
             current = process.ParentId;
         }
 
-        try
-        {
-            return Process.GetProcessById((int)processId).ProcessName.Equals("olk", StringComparison.OrdinalIgnoreCase);
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
+        return false;
     }
+
+    private static bool IsOutlookExecutable(string name) =>
+        name.Equals("olk", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("Microsoft.OutlookForWindows", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("PwaDrop.DragHarness", StringComparison.OrdinalIgnoreCase);
 
     private static Dictionary<uint, ProcessInfo> SnapshotProcessTree()
     {

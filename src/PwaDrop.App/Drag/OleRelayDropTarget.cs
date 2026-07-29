@@ -9,13 +9,13 @@ namespace PwaDrop.App.Drag;
 internal sealed class OleRelayDropTarget : IOleDropTarget
 {
     private readonly VirtualFileExtractor _extractor;
-    private readonly Action<ComTypes.IDataObject, NativeMethods.PointL> _drop;
+    private readonly Func<ComTypes.IDataObject, NativeMethods.PointL, bool> _drop;
     private readonly Action _leave;
     private bool _supported;
 
     internal OleRelayDropTarget(
         VirtualFileExtractor extractor,
-        Action<ComTypes.IDataObject, NativeMethods.PointL> drop,
+        Func<ComTypes.IDataObject, NativeMethods.PointL, bool> drop,
         Action leave)
     {
         _extractor = extractor;
@@ -51,10 +51,10 @@ internal sealed class OleRelayDropTarget : IOleDropTarget
             return 0;
         }
 
-        effect = NativeMethods.DropEffectCopy;
-        _drop(dataObject, point);
+        effect = _drop(dataObject, point)
+            ? NativeMethods.DropEffectCopy
+            : NativeMethods.DropEffectNone;
         _supported = false;
         return 0;
     }
 }
-

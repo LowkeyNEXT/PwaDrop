@@ -46,5 +46,4 @@ Also test duplicate names, Unicode, shared mailbox items, an attachment over 10 
 
 ## Browser fixture
 
-Use a local page whose drop handler logs `event.dataTransfer.files` names, sizes, and types. Do not add PwaDrop-specific JavaScript—the point is to validate an ordinary HTML file drop target.
-
+Open `tests/browser-drop-target/index.html` in Edge or Chrome. Its drop handler logs `event.dataTransfer.files` names, sizes, and types and contains no PwaDrop-specific integration.

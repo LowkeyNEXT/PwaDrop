@@ -11,7 +11,7 @@ internal sealed class RelayOverlayForm : Form
 
     internal RelayOverlayForm(
         VirtualFileExtractor extractor,
-        Action<ComTypes.IDataObject, NativeMethods.PointL> drop,
+        Func<ComTypes.IDataObject, NativeMethods.PointL, bool> drop,
         Action leave)
     {
         _dropTarget = new OleRelayDropTarget(extractor, drop, leave);

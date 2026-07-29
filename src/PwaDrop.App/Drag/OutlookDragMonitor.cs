@@ -10,6 +10,7 @@ internal sealed class OutlookDragMonitor : IDisposable
     private readonly NativeMethods.HookProc _callback;
     private IntPtr _hook;
     private IntPtr _sourceRoot;
+    private uint _sourceProcessId;
     private NativeMethods.Point _startPoint;
     private bool _thresholdPassed;
 
@@ -29,7 +30,11 @@ internal sealed class OutlookDragMonitor : IDisposable
             return;
         }
 
-        _hook = NativeMethods.SetWindowsHookEx(NativeMethods.WhMouseLl, _callback, IntPtr.Zero, 0);
+        _hook = NativeMethods.SetWindowsHookEx(
+            NativeMethods.WhMouseLl,
+            _callback,
+            NativeMethods.GetModuleHandle(null),
+            0);
         if (_hook == IntPtr.Zero)
         {
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Unable to monitor New Outlook drags.");
@@ -40,6 +45,7 @@ internal sealed class OutlookDragMonitor : IDisposable
     {
         _overlay.HideRelay();
         _sourceRoot = IntPtr.Zero;
+        _sourceProcessId = 0;
         _thresholdPassed = false;
         if (_hook != IntPtr.Zero)
         {
@@ -74,6 +80,7 @@ internal sealed class OutlookDragMonitor : IDisposable
                 break;
             case NativeMethods.WmLButtonUp:
                 _sourceRoot = IntPtr.Zero;
+                _sourceProcessId = 0;
                 _thresholdPassed = false;
                 break;
         }
@@ -87,10 +94,12 @@ internal sealed class OutlookDragMonitor : IDisposable
         if (window == IntPtr.Zero || !ProcessClassifier.IsNewOutlookWindow(window))
         {
             _sourceRoot = IntPtr.Zero;
+            _sourceProcessId = 0;
             return;
         }
 
         _sourceRoot = NativeMethods.GetAncestor(window, NativeMethods.GaRoot);
+        NativeMethods.GetWindowThreadProcessId(_sourceRoot, out _sourceProcessId);
         _startPoint = point;
         _thresholdPassed = false;
     }
@@ -118,7 +127,8 @@ internal sealed class OutlookDragMonitor : IDisposable
             ? WindowSearch.FindTopLevelAtPoint(point, excluded)
             : NativeMethods.GetAncestor(NativeMethods.WindowFromPoint(point), NativeMethods.GaRoot);
 
-        if (target == IntPtr.Zero || target == _sourceRoot || ProcessClassifier.IsNewOutlookWindow(target))
+        NativeMethods.GetWindowThreadProcessId(target, out var targetProcessId);
+        if (target == IntPtr.Zero || target == _sourceRoot || targetProcessId == _sourceProcessId)
         {
             _overlay.HideRelay();
             return;
@@ -127,4 +137,3 @@ internal sealed class OutlookDragMonitor : IDisposable
         _overlay.ShowRelay();
     }
 }
-
