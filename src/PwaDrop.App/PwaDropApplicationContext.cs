@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Win32;
 using PwaDrop.App.Brand;
+using PwaDrop.App.Diagnostics;
 using PwaDrop.App.Drag;
 using PwaDrop.App.Interop;
 using PwaDrop.App.Ui;
@@ -15,6 +16,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private const string StartupValueName = "PwaDrop";
     private readonly string _dataPath;
     private readonly string _settingsPath;
+    private readonly DiagnosticLog _diagnostics;
     private readonly CacheManager _cache;
     private readonly VirtualFileExtractor _extractor;
     private readonly RelayOverlayForm _overlay;
@@ -32,6 +34,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     {
         _dataPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "PwaDrop");
         _settingsPath = Path.Combine(_dataPath, "settings.json");
+        _diagnostics = new DiagnosticLog(Path.Combine(_dataPath, "diagnostics.log"));
         var cachePath = Path.Combine(_dataPath, "Cache");
         _settings = AppSettings.Load(_settingsPath);
         _cache = new CacheManager(cachePath);
@@ -59,6 +62,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Settings…", null, (_, _) => ShowSettings());
         menu.Items.Add("Open cache", null, (_, _) => OpenCache());
+        menu.Items.Add("Open diagnostics", null, (_, _) => OpenDiagnostics());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Exit());
 
@@ -114,35 +118,90 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
 
         _relayBusy = true;
         _overlay.HideRelay();
+        var operationStarted = Stopwatch.GetTimestamp();
+        _diagnostics.ExtractionStarted(payloadKind);
         try
         {
-            SetStatus("Preparing files…");
-            var extraction = _extractor.Extract(dataObject, payloadKind);
-            _dispatcher.BeginInvoke(() => ReplayExtraction(extraction));
+            SetStatus("Downloading from Outlook…");
+            var extractionTask = _extractor.ExtractAfterDropAsync(dataObject, payloadKind);
+            _ = CompleteVirtualDropAsync(extractionTask, payloadKind, operationStarted);
             return true;
         }
         catch (Exception exception)
         {
             _relayBusy = false;
             SetStatus("Bridge active");
+            _diagnostics.ExtractionFailed(
+                payloadKind,
+                exception.HResult,
+                Stopwatch.GetElapsedTime(operationStarted));
             ShowError("PwaDrop could not prepare that item.", exception.HResult);
             return false;
         }
     }
 
-    private void ReplayExtraction(ExtractionResult extraction)
+    private async Task CompleteVirtualDropAsync(
+        Task<ExtractionResult> extractionTask,
+        DragPayloadKind payloadKind,
+        long operationStarted)
     {
         try
         {
-            SetStatus("Dropping files…");
-            var effect = PhysicalFileReplay.Replay(extraction.Files);
-            if ((effect & DragDropEffects.Copy) == DragDropEffects.Copy)
+            var extraction = await extractionTask.ConfigureAwait(false);
+            _diagnostics.ExtractionCompleted(
+                payloadKind,
+                extraction.Files.Count,
+                Stopwatch.GetElapsedTime(operationStarted));
+            if (!_shutdown.IsCancellationRequested)
             {
-                _trayIcon.ShowBalloonTip(1500, "PwaDrop", $"Dropped {extraction.Files.Count} file{(extraction.Files.Count == 1 ? string.Empty : "s")}.", ToolTipIcon.Info);
+                _dispatcher.BeginInvoke(() => ReplayExtraction(extraction, operationStarted));
             }
         }
         catch (Exception exception)
         {
+            if (!_shutdown.IsCancellationRequested)
+            {
+                _diagnostics.ExtractionFailed(
+                    payloadKind,
+                    exception.HResult,
+                    Stopwatch.GetElapsedTime(operationStarted));
+                _dispatcher.BeginInvoke(() => HandleExtractionFailure(exception.HResult));
+            }
+        }
+    }
+
+    private void HandleExtractionFailure(int errorCode)
+    {
+        _relayBusy = false;
+        SetStatus(_settings.Enabled ? "Bridge active" : "Bridge paused");
+        ShowError("PwaDrop could not prepare that item.", errorCode);
+    }
+
+    private void ReplayExtraction(ExtractionResult extraction, long operationStarted)
+    {
+        try
+        {
+            SetStatus("Dropping files…");
+            var replay = PhysicalFileReplay.Replay(extraction.Files);
+            _diagnostics.ReplayCompleted(replay, Stopwatch.GetElapsedTime(operationStarted));
+            if (replay.Accepted)
+            {
+                _trayIcon.ShowBalloonTip(1500, "PwaDrop", $"Dropped {extraction.Files.Count} file{(extraction.Files.Count == 1 ? string.Empty : "s")}.", ToolTipIcon.Info);
+            }
+            else
+            {
+                _trayIcon.ShowBalloonTip(
+                    5000,
+                    "PwaDrop",
+                    $"The destination declined the replay. OLE 0x{replay.HResult:X8}, effect 0x{(uint)replay.Effect:X8}.",
+                    ToolTipIcon.Warning);
+            }
+        }
+        catch (Exception exception)
+        {
+            _diagnostics.ReplayFailed(
+                exception.HResult,
+                Stopwatch.GetElapsedTime(operationStarted));
             ShowError("The destination did not accept the prepared files.", exception.HResult);
         }
         finally
@@ -166,6 +225,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
 
     private void HandleUnsupportedDrag()
     {
+        _diagnostics.UnsupportedPayload();
         _dispatcher.BeginInvoke(() =>
         {
             _overlay.HideRelay();
@@ -252,6 +312,17 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     {
         Directory.CreateDirectory(_cache.RootPath);
         Process.Start(new ProcessStartInfo("explorer.exe", _cache.RootPath) { UseShellExecute = true });
+    }
+
+    private void OpenDiagnostics()
+    {
+        Directory.CreateDirectory(_dataPath);
+        if (!File.Exists(_diagnostics.Path))
+        {
+            File.WriteAllText(_diagnostics.Path, string.Empty);
+        }
+
+        Process.Start(new ProcessStartInfo("notepad.exe", _diagnostics.Path) { UseShellExecute = true });
     }
 
     private static void ConfigureStartup(bool enabled)
