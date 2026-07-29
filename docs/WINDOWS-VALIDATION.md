@@ -16,9 +16,10 @@ Record results in a pull request before marking an installer as beta. Never test
 2. Start `PwaDrop.DragHarness`.
 3. Drag the delayed `CF_HDROP` source card onto the physical target card.
 4. Confirm exactly `test-conversation.eml` and `invoice.pdf` appear with non-zero sizes.
-5. Repeat 20 times, including after moving the windows across monitors with different scaling.
-6. Cancel five drags with Escape and confirm no target drop and no stale overlay.
-7. Pause PwaDrop and confirm the harness target rejects the virtual source.
+5. Confirm Outlook and the harness remain responsive while the delayed files are prepared.
+6. Repeat 20 times, including after moving the windows across monitors with different scaling.
+7. Cancel five drags with Escape and confirm no target drop and no stale overlay.
+8. Pause PwaDrop and confirm the harness target rejects the virtual source.
 
 Pass criterion: 20/20 relays, 5/5 cancellations, no extra click, no cursor jump, no stuck transparent window.
 
@@ -43,6 +44,7 @@ Also test duplicate names, Unicode, shared mailbox items, an attachment over 10 
 - Confirm `.partial` files are removed after a failed transfer.
 - Confirm successful sessions disappear after the grace period.
 - Search diagnostic output for the test subjects, filenames, URLs, and content; none may appear.
+- Confirm each attempted relay records `extraction_completed` followed by `replay_completed` with its HRESULT and effect.
 
 ## Browser fixture
 

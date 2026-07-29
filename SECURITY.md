@@ -14,3 +14,4 @@ Do not open a public issue for a vulnerability that could expose file contents, 
 - Temporary paths are generated under the current user's local application data directory.
 - Web-origin files receive a `Zone.Identifier` marker when the filesystem supports alternate data streams.
 - PwaDrop does not attempt to bridge into elevated target applications.
+- Redacted diagnostics contain only payload kind, file count, timing, HRESULT, and drop effect; they never include names, subjects, paths, URLs, or content.
