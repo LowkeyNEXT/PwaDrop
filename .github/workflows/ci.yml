@@ -22,7 +22,7 @@ jobs:
         run: dotnet build PwaDrop.slnx --configuration Release --no-restore
       - name: Unit tests
         run: dotnet test tests/PwaDrop.Core.Tests/PwaDrop.Core.Tests.csproj --configuration Release --no-build
-      - name: Deferred CF_HDROP self-test
+      - name: Primed original CF_HDROP self-test
         run: dotnet tests/PwaDrop.DragHarness/bin/Release/net10.0-windows10.0.26100.0/PwaDrop.DragHarness.dll --self-test
       - name: Publish self-contained MVP
         run: >-

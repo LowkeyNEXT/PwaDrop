@@ -28,6 +28,15 @@ internal sealed class DiagnosticLog
     internal void ReplayFailed(int errorCode, TimeSpan elapsed) =>
         Write($"replay_failed hresult=0x{errorCode:X8} elapsed_ms={elapsed.TotalMilliseconds:F0}");
 
+    internal void PrimeStarted(bool ownsOperation) =>
+        Write($"prime_started owns_operation={ownsOperation}");
+
+    internal void PrimeCompleted(string reason, int endResult, TimeSpan elapsed) =>
+        Write($"prime_completed reason={reason} hresult=0x{endResult:X8} elapsed_ms={elapsed.TotalMilliseconds:F0}");
+
+    internal void PrimeFailed(int errorCode) =>
+        Write($"prime_failed hresult=0x{errorCode:X8}");
+
     internal void UnsupportedPayload() => Write("unsupported_payload");
 
     private void Write(string eventData)
