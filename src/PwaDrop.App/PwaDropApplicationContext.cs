@@ -25,10 +25,13 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private readonly ToolStripMenuItem _enabledMenuItem;
     private readonly Control _dispatcher;
     private readonly CancellationTokenSource _shutdown = new();
+    private readonly object _primeGate = new();
+    private readonly HashSet<PrimedDragState> _activePrimes = [];
     private SettingsForm? _settingsForm;
     private AppSettings _settings;
     private bool _relayBusy;
     private DateTimeOffset _lastUnsupportedNotice;
+    private PrimedDragState? _currentPrime;
 
     internal PwaDropApplicationContext()
     {
@@ -44,11 +47,15 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         _dispatcher.CreateControl();
         _overlay = new RelayOverlayForm(
             _extractor,
+            HandleAsyncFileDropPrime,
             HandleVirtualDrop,
             HandleRelayLeave,
             HandleUnsupportedDrag);
         _ = _overlay.Handle;
-        _monitor = new OutlookDragMonitor(_overlay, GetExcludedWindows);
+        _monitor = new OutlookDragMonitor(
+            _overlay,
+            GetExcludedWindows,
+            HandlePrimedDragReleased);
 
         _enabledMenuItem = new ToolStripMenuItem("Bridge enabled")
         {
@@ -83,6 +90,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         if (disposing)
         {
             _shutdown.Cancel();
+            CompleteAllPrimes("shutdown", NativeMethods.DropEffectNone);
             _monitor.Dispose();
             _overlay.Dispose();
             _settingsForm?.Dispose();
@@ -137,6 +145,119 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
                 Stopwatch.GetElapsedTime(operationStarted));
             ShowError("PwaDrop could not prepare that item.", exception.HResult);
             return false;
+        }
+    }
+
+    private bool HandleAsyncFileDropPrime(ComTypes.IDataObject dataObject)
+    {
+        PrimedDragState? stalePrime;
+        lock (_primeGate)
+        {
+            stalePrime = _currentPrime;
+            _currentPrime = null;
+        }
+
+        if (stalePrime is not null)
+        {
+            CompletePrime(stalePrime, "replaced", NativeMethods.DropEffectNone);
+        }
+
+        try
+        {
+            var operation = _extractor.PrimeAsyncFileDrop(dataObject);
+            var state = new PrimedDragState(operation, Stopwatch.GetTimestamp());
+            lock (_primeGate)
+            {
+                _currentPrime = state;
+                _activePrimes.Add(state);
+            }
+
+            _monitor.MarkCurrentDragPrimed();
+            _diagnostics.PrimeStarted(operation.OwnsOperation);
+            SetStatus("Original drag primed");
+            _dispatcher.BeginInvoke(() =>
+            {
+                _overlay.HideRelay();
+                SetStatus(_settings.Enabled ? "Bridge active" : "Bridge paused");
+            });
+            _ = CompletePrimeAfterDelayAsync(state, TimeSpan.FromMinutes(2), "timeout");
+            return true;
+        }
+        catch (Exception exception)
+        {
+            _diagnostics.PrimeFailed(exception.HResult);
+            _dispatcher.BeginInvoke(() =>
+            {
+                _overlay.HideRelay();
+                ShowError("PwaDrop could not prime that Outlook drag.", exception.HResult);
+            });
+            return false;
+        }
+    }
+
+    private void HandlePrimedDragReleased()
+    {
+        PrimedDragState? state;
+        lock (_primeGate)
+        {
+            state = _currentPrime;
+            _currentPrime = null;
+        }
+
+        if (state is not null)
+        {
+            _ = CompletePrimeAfterDelayAsync(state, TimeSpan.FromSeconds(30), "released");
+        }
+    }
+
+    private async Task CompletePrimeAfterDelayAsync(
+        PrimedDragState state,
+        TimeSpan delay,
+        string reason)
+    {
+        try
+        {
+            await Task.Delay(delay, _shutdown.Token).ConfigureAwait(false);
+            CompletePrime(state, reason, NativeMethods.DropEffectCopy);
+        }
+        catch (OperationCanceledException)
+        {
+            // Application shutdown completes the operation synchronously.
+        }
+    }
+
+    private void CompleteAllPrimes(string reason, uint effect)
+    {
+        PrimedDragState[] states;
+        lock (_primeGate)
+        {
+            states = [.. _activePrimes];
+            _currentPrime = null;
+        }
+
+        foreach (var state in states)
+        {
+            CompletePrime(state, reason, effect);
+        }
+    }
+
+    private void CompletePrime(PrimedDragState state, string reason, uint effect)
+    {
+        if (state.Operation.TryComplete(0, effect, out var endResult))
+        {
+            _diagnostics.PrimeCompleted(
+                reason,
+                endResult,
+                Stopwatch.GetElapsedTime(state.Started));
+        }
+
+        lock (_primeGate)
+        {
+            _activePrimes.Remove(state);
+            if (ReferenceEquals(_currentPrime, state))
+            {
+                _currentPrime = null;
+            }
         }
     }
 
@@ -351,4 +472,6 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         _trayIcon.Visible = false;
         ExitThread();
     }
+
+    private sealed record PrimedDragState(PrimedDragOperation Operation, long Started);
 }

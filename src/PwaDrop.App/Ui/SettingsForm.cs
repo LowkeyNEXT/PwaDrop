@@ -41,7 +41,7 @@ internal sealed class SettingsForm : Form
         Controls.Add(header);
         header.BringToFront();
 
-        _enabledToggle = CreateToggle("Enable drag bridge", "Convert New Outlook virtual files into normal Windows file drops.");
+        _enabledToggle = CreateToggle("Enable drag bridge", "Prime New Outlook downloads while preserving the original drag.");
         _startupToggle = CreateToggle("Start with Windows", "Keep PwaDrop ready in the notification area after sign-in.");
         content.Controls.Add(WrapCard(_enabledToggle), 0, 0);
         content.Controls.Add(WrapCard(_startupToggle), 0, 1);
@@ -56,7 +56,7 @@ internal sealed class SettingsForm : Form
         };
         var privacyBody = new Label
         {
-            Text = "Files are streamed through New Outlook's existing session, marked as Internet content, and removed after the destination has time to read them. No telemetry or mailbox login.",
+            Text = "New Outlook stays responsible for producing async files directly to the destination. PwaDrop does not read their paths or contents. No telemetry or mailbox login.",
             AutoEllipsis = true,
             Location = new Point(20, 44),
             Size = new Size(560, 52),

@@ -3,8 +3,8 @@
 ## 0.1 — MVP
 
 - New Outlook process detection
-- Virtual-file streaming and safe temporary cache
-- Automatic physical-file replay
+- Original-drag priming for Chromium asynchronous `CF_HDROP`
+- Safe temporary cache and replay fallback for legacy virtual-file descriptors
 - Tray/settings experience and branded MSIX setup
 - Deterministic source/target harness
 

@@ -19,6 +19,7 @@ internal sealed class VirtualFileDataObject :
     private IReadOnlyList<string>? _temporaryPaths;
     private bool _asyncMode = true;
     private bool _inOperation;
+    private bool _inDragLoop = true;
 
     internal VirtualFileDataObject(params VirtualTestFile[] files)
     {
@@ -33,9 +34,9 @@ internal sealed class VirtualFileDataObject :
             throw new COMException("Unsupported format.", unchecked((int)0x80040064));
         }
 
-        if (!_inOperation)
+        if (_inDragLoop || !_inOperation)
         {
-            throw new COMException("The delayed download has not started.", unchecked((int)0x8000000A));
+            throw new COMException("The delayed download is not ready.", unchecked((int)0x8000000A));
         }
 
         var paths = MaterializeTemporaryFiles();
@@ -123,6 +124,11 @@ internal sealed class VirtualFileDataObject :
     {
         _inOperation = false;
         return 0;
+    }
+
+    internal void FinishDragLoop()
+    {
+        _inDragLoop = false;
     }
 
     public void Dispose()
