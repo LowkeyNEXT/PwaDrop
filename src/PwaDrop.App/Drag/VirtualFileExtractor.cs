@@ -83,6 +83,39 @@ internal sealed class VirtualFileExtractor
         return CompleteAsyncFileDropAfterOriginalDragAsync(dataObject, payloadKind, asyncOperation);
     }
 
+    internal PrimedDragOperation PrimeAsyncFileDrop(ComTypes.IDataObject dataObject)
+    {
+        var fileDrop = CreateFormat(NativeMethods.CfHDrop, -1, NativeMethods.TymedHGlobal);
+        if (dataObject.QueryGetData(ref fileDrop) != 0)
+        {
+            throw new NotSupportedException("The drag did not advertise CF_HDROP.");
+        }
+
+        var asyncOperation = GetAsyncCapability(dataObject);
+        if (asyncOperation is null ||
+            asyncOperation.GetAsyncMode(out var asyncMode) != 0 ||
+            !asyncMode)
+        {
+            throw new InvalidOperationException("The file drop did not expose asynchronous capability.");
+        }
+
+        var ownsOperation = true;
+        if (asyncOperation.InOperation(out var alreadyInOperation) == 0 && alreadyInOperation)
+        {
+            ownsOperation = false;
+        }
+        else
+        {
+            var startResult = asyncOperation.StartOperation(null);
+            if (startResult < 0)
+            {
+                Marshal.ThrowExceptionForHR(startResult);
+            }
+        }
+
+        return new PrimedDragOperation(dataObject, asyncOperation, ownsOperation);
+    }
+
     private async Task<ExtractionResult> CompleteAsyncFileDropAfterOriginalDragAsync(
         ComTypes.IDataObject dataObject,
         DragPayloadKind payloadKind,
@@ -221,7 +254,7 @@ internal sealed class VirtualFileExtractor
         return outputPaths;
     }
 
-    private static IReadOnlyList<string> ReadFileDropPaths(ComTypes.IDataObject dataObject)
+    internal static IReadOnlyList<string> ReadFileDropPaths(ComTypes.IDataObject dataObject)
     {
         var format = CreateFormat(NativeMethods.CfHDrop, -1, NativeMethods.TymedHGlobal);
         dataObject.GetData(ref format, out var medium);
@@ -524,4 +557,52 @@ internal enum DragPayloadKind
     Unsupported,
     VirtualFileDescriptors,
     AsyncFileDrop
+}
+
+internal sealed class PrimedDragOperation : IDisposable
+{
+    private ComTypes.IDataObject? _dataObject;
+    private IDataObjectAsyncCapability? _asyncOperation;
+    private readonly bool _ownsOperation;
+    private int _completed;
+
+    internal PrimedDragOperation(
+        ComTypes.IDataObject dataObject,
+        IDataObjectAsyncCapability asyncOperation,
+        bool ownsOperation)
+    {
+        _dataObject = dataObject;
+        _asyncOperation = asyncOperation;
+        _ownsOperation = ownsOperation;
+    }
+
+    internal bool OwnsOperation => _ownsOperation;
+
+    internal int Complete(int result = 0, uint effect = NativeMethods.DropEffectCopy)
+    {
+        return TryComplete(result, effect, out var endResult) ? endResult : 0;
+    }
+
+    internal bool TryComplete(int result, uint effect, out int endResult)
+    {
+        if (Interlocked.Exchange(ref _completed, 1) != 0)
+        {
+            endResult = 0;
+            return false;
+        }
+
+        var asyncOperation = Interlocked.Exchange(ref _asyncOperation, null);
+        var dataObject = Interlocked.Exchange(ref _dataObject, null);
+        endResult = _ownsOperation && asyncOperation is not null
+            ? asyncOperation.EndOperation(result, null, effect)
+            : 0;
+        GC.KeepAlive(dataObject);
+        return true;
+    }
+
+    public void Dispose()
+    {
+        _ = Complete();
+        GC.SuppressFinalize(this);
+    }
 }

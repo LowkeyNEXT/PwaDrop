@@ -17,14 +17,14 @@ internal sealed class HarnessForm : Form
 
         var title = new Label
         {
-            Text = "Virtual-file relay test",
+            Text = "Original-drag priming test",
             Font = new Font(Font.FontFamily, 20f, FontStyle.Bold),
             AutoSize = true,
             Location = new Point(34, 28)
         };
         var instructions = new Label
         {
-            Text = "Run PwaDrop, then drag the source card to the target. The source delays CF_HDROP materialization until StartOperation, matching Chromium; the target accepts only physical files.",
+            Text = "Run PwaDrop, then drag the source card to the target. PwaDrop primes delayed CF_HDROP and gets out of the way; the target receives that same original drag as physical files.",
             AutoEllipsis = true,
             Location = new Point(38, 74),
             Size = new Size(810, 48),
@@ -117,7 +117,7 @@ internal sealed class HarnessForm : Form
 
         NativeMethods.DoDragDrop(
             dataObject,
-            new MouseDropSource(),
+            new MouseDropSource(dataObject),
             NativeMethods.DropEffectCopy,
             out _);
     }

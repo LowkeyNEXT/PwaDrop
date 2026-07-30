@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using PwaDrop.App.Drag;
 using PwaDrop.App.Interop;
@@ -52,31 +53,55 @@ internal static class Program
                 throw new InvalidOperationException($"Expected an async file drop, received {payloadKind}.");
             }
 
-            var extractionTask = extractor.ExtractAfterDropAsync(dataObject, payloadKind);
-            if (extractionTask.IsCompleted)
+            try
             {
-                throw new InvalidOperationException("Delayed extraction blocked the original Drop callback.");
+                _ = VirtualFileExtractor.ReadFileDropPaths(dataObject);
+                throw new InvalidOperationException("The delayed source rendered before StartOperation.");
+            }
+            catch (COMException)
+            {
+                // Chromium-style delayed data is unavailable before priming.
             }
 
-            var extraction = extractionTask.GetAwaiter().GetResult();
-            if (extraction.Files.Count != 2 ||
-                !File.ReadAllBytes(extraction.Files[0]).SequenceEqual(eml) ||
-                !File.ReadAllBytes(extraction.Files[1]).SequenceEqual(pdf))
+            using var primedDrag = extractor.PrimeAsyncFileDrop(dataObject);
+            if (!primedDrag.OwnsOperation ||
+                dataObject.InOperation(out var inOperation) != 0 ||
+                !inOperation)
             {
-                throw new InvalidDataException("The extracted test files did not match the delayed source data.");
+                throw new InvalidOperationException("StartOperation did not prime the original data object.");
             }
 
-            if (!new PhysicalReplayResult(
-                    unchecked((int)NativeMethods.DragDropSDrop),
-                    DragDropEffects.Copy).Accepted ||
-                new PhysicalReplayResult(
-                    unchecked((int)NativeMethods.DragDropSDrop),
-                    DragDropEffects.None).Accepted)
+            try
             {
-                throw new InvalidOperationException("Physical replay result classification was invalid.");
+                _ = VirtualFileExtractor.ReadFileDropPaths(dataObject);
+                throw new InvalidOperationException("Priming rendered data before the original drag ended.");
+            }
+            catch (COMException)
+            {
+                // Chromium still refuses GetData while its source drag loop is active.
             }
 
-            Console.WriteLine("Deferred CF_HDROP self-test passed.");
+            dataObject.FinishDragLoop();
+            var targetPaths = VirtualFileExtractor.ReadFileDropPaths(dataObject);
+            if (targetPaths.Count != 2 ||
+                !File.ReadAllBytes(targetPaths[0]).SequenceEqual(eml) ||
+                !File.ReadAllBytes(targetPaths[1]).SequenceEqual(pdf))
+            {
+                throw new InvalidDataException("The target did not receive the primed source data byte-for-byte.");
+            }
+
+            _ = primedDrag.Complete();
+            if (dataObject.InOperation(out inOperation) != 0 || inOperation)
+            {
+                throw new InvalidOperationException("EndOperation did not close the primed data operation.");
+            }
+
+            if (Directory.Exists(cacheRoot))
+            {
+                throw new InvalidOperationException("Priming unexpectedly created a PwaDrop cache session.");
+            }
+
+            Console.WriteLine("Primed original CF_HDROP self-test passed.");
             return 0;
         }
         catch (Exception exception)

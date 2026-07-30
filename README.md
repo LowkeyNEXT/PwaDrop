@@ -9,16 +9,15 @@
 PwaDrop is an open-source Windows utility that turns New Outlook's asynchronous virtual files into normal file drops. It is designed for the missing workflow where an email or attachment can be dragged to File Explorer, but not directly into a browser upload target, a ServiceNow ticket, or another Windows application.
 
 > [!IMPORTANT]
-> This repository contains a cross-compiling MVP and a purpose-built Windows drag harness. Alpha 3 moves delayed Outlook materialization out of the original OLE callback and waits for that drag loop to unwind before replay. It still needs the complete [Windows validation matrix](docs/WINDOWS-VALIDATION.md) before it should be treated as a beta.
+> This repository contains a cross-compiling MVP and a purpose-built Windows drag harness. Alpha 4 primes Chromium's original asynchronous data object and passes that same drag through to the destination. It still needs the complete [Windows validation matrix](docs/WINDOWS-VALIDATION.md) before it should be treated as a beta.
 
 ## MVP behavior
 
 - Watches only drags that originate from the installed New Outlook process tree.
 - Detects Chromium's asynchronous `CF_HDROP` downloads and legacy Shell virtual files (`FileGroupDescriptorW` and `FileContents`).
-- Streams selected messages and attachments into a private per-user cache.
-- Replays the drop as normal physical file paths at the original destination.
-- Preserves `.eml` messages and original attachment names.
-- Marks web-origin files with Mark of the Web and removes temporary sessions after a grace period.
+- Calls `IDataObjectAsyncCapability.StartOperation` before an async Chromium drag reaches its destination.
+- Preserves the original mouse gesture and `IDataObject`; no second drag is synthesized for New Outlook.
+- Retains safe cache-and-replay support only for legacy descriptor-based virtual files.
 - Uses no Graph permissions, Outlook add-in, browser extension, mailbox login, or telemetry.
 - Records only redacted payload type, timing, file count, and OLE result diagnostics under `%LOCALAPPDATA%\PwaDrop`.
 
@@ -27,21 +26,18 @@ PwaDrop is an open-source Windows utility that turns New Outlook's asynchronous 
 ```mermaid
 sequenceDiagram
     participant O as New Outlook
-    participant R as PwaDrop relay
-    participant C as Private cache
+    participant R as PwaDrop primer
     participant T as Browser or Windows target
 
     O->>R: Delayed CF_HDROP drag
-    R->>O: StartOperation after Drop
-    R-->>O: Return from original Drop
-    O-->>R: Authenticated temporary paths
-    R->>C: Copy to random private paths
-    R->>T: Replay as CF_HDROP files
-    T-->>R: Copy accepted or rejected
-    R->>C: Delayed cleanup
+    R->>O: StartOperation during DragEnter
+    R-->>T: Hide and pass through original IDataObject
+    T->>O: GetData(CF_HDROP) on original Drop
+    O-->>T: Authenticated physical paths
+    R->>O: EndOperation after destination handoff
 ```
 
-New Outlook is a WebView2-based native application. Chromium advertises download-on-drop items as `CF_HDROP`, but does not materialize their temporary paths until a receiver begins an `IDataObjectAsyncCapability` operation after the drop. PwaDrop completes that operation, makes private copies, and replays stable physical paths to the destination. See the [architecture notes](docs/ARCHITECTURE.md).
+New Outlook is a WebView2-based native application. Chromium advertises download-on-drop items as `CF_HDROP`, but refuses delayed rendering until `IDataObjectAsyncCapability.StartOperation` has been called. Some destinations do not negotiate that optional interface. PwaDrop briefly becomes the drag target, starts the operation, then removes itself so the untouched original drag continues into the real destination. See the [architecture notes](docs/ARCHITECTURE.md).
 
 ## Build and run
 
@@ -56,7 +52,7 @@ Requirements:
 dotnet run --project .\src\PwaDrop.App\PwaDrop.App.csproj
 ```
 
-PwaDrop starts in the notification area. Double-click its icon to open settings. Use **Open diagnostics** from the tray menu to inspect redacted extraction timing and the final OLE replay result.
+PwaDrop starts in the notification area. Double-click its icon to open settings. Use **Open diagnostics** from the tray menu to inspect redacted priming and legacy-relay events.
 
 ### Test without Outlook
 
@@ -66,7 +62,7 @@ In a second terminal:
 dotnet run --project .\tests\PwaDrop.DragHarness\PwaDrop.DragHarness.csproj
 ```
 
-Drag the harness's **DRAG FROM HERE** card onto **DROP HERE**. The source refuses to provide paths until `StartOperation`, waits briefly, and then returns `CF_HDROP`; the target accepts only physical paths. A successful two-file result exercises the delayed materialization and replay path used by alpha 2.
+Drag the harness's **DRAG FROM HERE** card onto **DROP HERE**. The source refuses to provide paths until `StartOperation`, while the target knows only ordinary `FileDrop`. A successful two-file result proves PwaDrop primed the original data object and then got out of its way.
 
 For a browser destination, open [`tests/browser-drop-target/index.html`](tests/browser-drop-target/index.html) in Edge or Chrome and drag the harness source onto its drop zone.
 

@@ -7,21 +7,32 @@ internal sealed class OutlookDragMonitor : IDisposable
 {
     private readonly RelayOverlayForm _overlay;
     private readonly Func<IReadOnlyList<IntPtr>> _excludedWindows;
+    private readonly Action _primedDragReleased;
     private readonly NativeMethods.HookProc _callback;
     private IntPtr _hook;
     private IntPtr _sourceRoot;
     private uint _sourceProcessId;
     private NativeMethods.Point _startPoint;
     private bool _thresholdPassed;
+    private bool _currentDragPrimed;
 
-    internal OutlookDragMonitor(RelayOverlayForm overlay, Func<IReadOnlyList<IntPtr>> excludedWindows)
+    internal OutlookDragMonitor(
+        RelayOverlayForm overlay,
+        Func<IReadOnlyList<IntPtr>> excludedWindows,
+        Action primedDragReleased)
     {
         _overlay = overlay;
         _excludedWindows = excludedWindows;
+        _primedDragReleased = primedDragReleased;
         _callback = HookCallback;
     }
 
     internal bool IsRunning => _hook != IntPtr.Zero;
+
+    internal void MarkCurrentDragPrimed()
+    {
+        _currentDragPrimed = true;
+    }
 
     internal void Start()
     {
@@ -47,6 +58,7 @@ internal sealed class OutlookDragMonitor : IDisposable
         _sourceRoot = IntPtr.Zero;
         _sourceProcessId = 0;
         _thresholdPassed = false;
+        _currentDragPrimed = false;
         if (_hook != IntPtr.Zero)
         {
             NativeMethods.UnhookWindowsHookEx(_hook);
@@ -73,15 +85,23 @@ internal sealed class OutlookDragMonitor : IDisposable
         switch (message)
         {
             case NativeMethods.WmLButtonDown:
+                _currentDragPrimed = false;
                 BeginCandidate(hookData.Point);
                 break;
             case NativeMethods.WmMouseMove:
                 TrackCandidate(hookData.Point);
                 break;
             case NativeMethods.WmLButtonUp:
+                var primedDragReleased = _currentDragPrimed;
                 _sourceRoot = IntPtr.Zero;
                 _sourceProcessId = 0;
                 _thresholdPassed = false;
+                _currentDragPrimed = false;
+                if (primedDragReleased)
+                {
+                    _primedDragReleased();
+                }
+
                 break;
         }
 
@@ -106,6 +126,12 @@ internal sealed class OutlookDragMonitor : IDisposable
 
     private void TrackCandidate(NativeMethods.Point point)
     {
+        if (_currentDragPrimed)
+        {
+            _overlay.HideRelay();
+            return;
+        }
+
         if (_sourceRoot == IntPtr.Zero || (NativeMethods.GetAsyncKeyState(NativeMethods.VkLButton) & 0x8000) == 0)
         {
             return;
