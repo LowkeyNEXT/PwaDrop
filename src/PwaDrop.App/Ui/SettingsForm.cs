@@ -729,7 +729,7 @@ internal sealed class SettingsForm : Form
             ForeColor = FluentTheme.TextSecondary,
             Location = new Point(textLeft + 2, titleTop + 30),
             Size = new Size(520, 38),
-            AutoEllipsis = false,
+            AutoEllipsis = true,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var rowToggle = new FluentToggle
