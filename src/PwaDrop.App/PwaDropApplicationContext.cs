@@ -20,8 +20,9 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private readonly CacheManager _cache;
     private readonly VirtualFileExtractor _extractor;
     private readonly RelayOverlayForm _overlay;
-    private readonly OutlookDragMonitor _monitor;
+    private readonly DragSourceMonitor _monitor;
     private readonly NotifyIcon _trayIcon;
+    private readonly ToolStripMenuItem _statusMenuItem;
     private readonly ToolStripMenuItem _enabledMenuItem;
     private readonly Control _dispatcher;
     private readonly CancellationTokenSource _shutdown = new();
@@ -30,7 +31,6 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private SettingsForm? _settingsForm;
     private AppSettings _settings;
     private bool _relayBusy;
-    private DateTimeOffset _lastUnsupportedNotice;
     private PrimedDragState? _currentPrime;
 
     internal PwaDropApplicationContext()
@@ -52,31 +52,49 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
             HandleRelayLeave,
             HandleUnsupportedDrag);
         _ = _overlay.Handle;
-        _monitor = new OutlookDragMonitor(
+        _monitor = new DragSourceMonitor(
             _overlay,
             GetExcludedWindows,
             HandlePrimedDragReleased);
 
-        _enabledMenuItem = new ToolStripMenuItem("Bridge enabled")
+        _statusMenuItem = new ToolStripMenuItem("Bridge active")
+        {
+            Enabled = false,
+            Font = new Font("Segoe UI Variable Text", 9.5f, FontStyle.Bold)
+        };
+        _enabledMenuItem = new ToolStripMenuItem("Enable drag bridge")
         {
             Checked = _settings.Enabled,
             CheckOnClick = true
         };
         _enabledMenuItem.Click += (_, _) => ApplySettings(_settings with { Enabled = _enabledMenuItem.Checked });
 
-        var menu = new ContextMenuStrip();
+        var menu = new ContextMenuStrip
+        {
+            BackColor = FluentTheme.Surface,
+            ForeColor = FluentTheme.TextPrimary,
+            Font = new Font("Segoe UI Variable Text", 9.5f),
+            Renderer = new FluentToolStripRenderer(),
+            ShowImageMargin = false,
+            Padding = new Padding(4),
+            MinimumSize = new Size(228, 0)
+        };
+        menu.Items.Add(_statusMenuItem);
+        menu.Items.Add("Open PWADrop", null, (_, _) => ShowSettings());
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(_enabledMenuItem);
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Settings…", null, (_, _) => ShowSettings());
-        menu.Items.Add("Open cache", null, (_, _) => OpenCache());
-        menu.Items.Add("Open diagnostics", null, (_, _) => OpenDiagnostics());
+        var diagnosticsMenu = new ToolStripMenuItem("Diagnostics");
+        diagnosticsMenu.DropDownItems.Add("Open diagnostic log", null, (_, _) => OpenDiagnostics());
+        diagnosticsMenu.DropDownItems.Add("Open compatibility cache", null, (_, _) => OpenCache());
+        menu.Items.Add(diagnosticsMenu);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Exit());
 
         _trayIcon = new NotifyIcon
         {
             Icon = BrandIcon.CreateIcon(64),
-            Text = "PwaDrop — New Outlook drag bridge",
+            Text = "PWADrop — Bridge active",
             ContextMenuStrip = menu,
             Visible = true
         };
@@ -130,7 +148,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         _diagnostics.ExtractionStarted(payloadKind);
         try
         {
-            SetStatus("Downloading from Outlook…");
+            SetStatus("Preparing delayed files…");
             var extractionTask = _extractor.ExtractAfterDropAsync(dataObject, payloadKind);
             _ = CompleteVirtualDropAsync(extractionTask, payloadKind, operationStarted);
             return true;
@@ -143,7 +161,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
                 payloadKind,
                 exception.HResult,
                 Stopwatch.GetElapsedTime(operationStarted));
-            ShowError("PwaDrop could not prepare that item.", exception.HResult);
+            ShowError("PWADrop could not prepare that item.", exception.HResult);
             return false;
         }
     }
@@ -189,7 +207,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
             _dispatcher.BeginInvoke(() =>
             {
                 _overlay.HideRelay();
-                ShowError("PwaDrop could not prime that Outlook drag.", exception.HResult);
+                ShowError("PWADrop could not prime that drag.", exception.HResult);
             });
             return false;
         }
@@ -295,7 +313,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     {
         _relayBusy = false;
         SetStatus(_settings.Enabled ? "Bridge active" : "Bridge paused");
-        ShowError("PwaDrop could not prepare that item.", errorCode);
+        ShowError("PWADrop could not prepare that item.", errorCode);
     }
 
     private void ReplayExtraction(ExtractionResult extraction, long operationStarted)
@@ -307,13 +325,16 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
             _diagnostics.ReplayCompleted(replay, Stopwatch.GetElapsedTime(operationStarted));
             if (replay.Accepted)
             {
-                _trayIcon.ShowBalloonTip(1500, "PwaDrop", $"Dropped {extraction.Files.Count} file{(extraction.Files.Count == 1 ? string.Empty : "s")}.", ToolTipIcon.Info);
+                if (_settings.ShowStatusNotifications)
+                {
+                    _trayIcon.ShowBalloonTip(1500, "PWADrop", $"Dropped {extraction.Files.Count} file{(extraction.Files.Count == 1 ? string.Empty : "s")}.", ToolTipIcon.Info);
+                }
             }
             else
             {
                 _trayIcon.ShowBalloonTip(
                     5000,
-                    "PwaDrop",
+                    "PWADrop",
                     $"The destination declined the replay. OLE 0x{replay.HResult:X8}, effect 0x{(uint)replay.Effect:X8}.",
                     ToolTipIcon.Warning);
             }
@@ -352,18 +373,6 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
             _overlay.HideRelay();
             SetStatus(_settings.Enabled ? "Bridge active" : "Bridge paused");
 
-            var now = DateTimeOffset.UtcNow;
-            if (now - _lastUnsupportedNotice < TimeSpan.FromSeconds(10))
-            {
-                return;
-            }
-
-            _lastUnsupportedNotice = now;
-            _trayIcon.ShowBalloonTip(
-                3500,
-                "PwaDrop",
-                "That Outlook drag did not expose a downloadable file. Try an email row or attachment.",
-                ToolTipIcon.Info);
         });
     }
 
@@ -380,7 +389,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
             catch (Exception exception)
             {
                 _settings = settings with { Enabled = false };
-                ShowError("PwaDrop could not start its drag monitor.", exception.HResult);
+                ShowError("PWADrop could not start its drag monitor.", exception.HResult);
             }
         }
         else if (!settings.Enabled && _monitor.IsRunning)
@@ -389,7 +398,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         }
 
         _enabledMenuItem.Checked = _settings.Enabled;
-        _enabledMenuItem.Text = _settings.Enabled ? "Bridge enabled" : "Bridge paused";
+        _enabledMenuItem.Text = "Enable drag bridge";
         ConfigureStartup(_settings.StartWithWindows);
         _settingsForm?.ApplySettings(_settings);
         SetStatus(_settings.Enabled ? "Bridge active" : "Bridge paused");
@@ -409,7 +418,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
 
     private SettingsForm CreateSettingsForm()
     {
-        var form = new SettingsForm(_settings, _cache.RootPath);
+        var form = new SettingsForm(_settings, _cache.RootPath, _diagnostics.Path);
         form.SettingsChanged += settings => ApplySettings(settings);
         return form;
     }
@@ -417,14 +426,15 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private void SetStatus(string status)
     {
         _settingsForm?.SetStatus(status);
-        _trayIcon.Text = status.Length <= 63 ? $"PwaDrop — {status}" : "PwaDrop";
+        _statusMenuItem.Text = status;
+        _trayIcon.Text = status.Length <= 63 ? $"PWADrop — {status}" : "PWADrop";
     }
 
     private void ShowError(string message, int errorCode)
     {
         _trayIcon.ShowBalloonTip(
             4000,
-            "PwaDrop",
+            "PWADrop",
             $"{message} Error 0x{errorCode:X8}.",
             ToolTipIcon.Warning);
     }

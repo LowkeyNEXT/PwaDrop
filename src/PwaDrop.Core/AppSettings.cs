@@ -2,7 +2,10 @@ using System.Text.Json;
 
 namespace PwaDrop.Core;
 
-public sealed record AppSettings(bool Enabled = true, bool StartWithWindows = false)
+public sealed record AppSettings(
+    bool Enabled = true,
+    bool StartWithWindows = false,
+    bool ShowStatusNotifications = true)
 {
     public static AppSettings Load(string path)
     {
@@ -35,4 +38,3 @@ public sealed record AppSettings(bool Enabled = true, bool StartWithWindows = fa
         File.Move(temporaryPath, path, overwrite: true);
     }
 }
-
