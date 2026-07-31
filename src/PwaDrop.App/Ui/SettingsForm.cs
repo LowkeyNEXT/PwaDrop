@@ -18,6 +18,7 @@ internal sealed class SettingsForm : Form
     private Button _maximizeButton = null!;
     private readonly Dictionary<NavigationButton, Control> _pages = [];
     private readonly Bitmap _brandBitmap;
+    private readonly Bitmap _bridgeBitmap;
     private bool _updating;
 
     internal SettingsForm(AppSettings settings, string cachePath, string diagnosticsPath)
@@ -34,6 +35,7 @@ internal sealed class SettingsForm : Form
         Font = FluentTheme.Text(10f);
         KeyPreview = true;
         _brandBitmap = BrandIcon.CreateBitmap(96);
+        _bridgeBitmap = BrandIcon.CreateBridgeHeroBitmap();
 
         var body = new Panel
         {
@@ -120,7 +122,7 @@ internal sealed class SettingsForm : Form
             : paused
                 ? "Enable the bridge when you are ready."
                 : "PWADrop is handling the current drag.";
-        _statusGlyph.Text = active ? "\uE73E" : paused ? "\uE769" : "\uE895";
+        _statusGlyph.Text = active ? "\uF13E" : paused ? "\uE769" : "\uE895";
         _statusGlyph.ForeColor = active ? FluentTheme.Success : paused ? FluentTheme.Warning : FluentTheme.Accent;
     }
 
@@ -158,6 +160,7 @@ internal sealed class SettingsForm : Form
         if (disposing)
         {
             _brandBitmap.Dispose();
+            _bridgeBitmap.Dispose();
         }
 
         base.Dispose(disposing);
@@ -239,9 +242,9 @@ internal sealed class SettingsForm : Form
         _maximizeButton.Dock = DockStyle.Right;
         minimizeButton.Dock = DockStyle.Right;
 
-        titleBar.Controls.Add(closeButton);
-        titleBar.Controls.Add(_maximizeButton);
         titleBar.Controls.Add(minimizeButton);
+        titleBar.Controls.Add(_maximizeButton);
+        titleBar.Controls.Add(closeButton);
         titleBar.Controls.Add(productName);
         titleBar.Controls.Add(logo);
         return titleBar;
@@ -305,15 +308,15 @@ internal sealed class SettingsForm : Form
         var hero = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
         var brand = new PictureBox
         {
-            Image = _brandBitmap,
+            Image = _bridgeBitmap,
             SizeMode = PictureBoxSizeMode.Zoom,
-            Size = new Size(108, 108),
+            Size = new Size(280, 116),
             Anchor = AnchorStyles.None,
             AccessibleName = "PWADrop bridge mark"
         };
         var heroStatusGlyph = new Label
         {
-            Text = "\uE73E",
+            Text = "\uF13E",
             Font = FluentTheme.Symbols(23f),
             ForeColor = FluentTheme.Success,
             AutoSize = true,
