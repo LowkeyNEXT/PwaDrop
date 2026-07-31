@@ -11,7 +11,7 @@ internal sealed class FluentToggle : CheckBox
         AutoSize = false;
         BackColor = FluentTheme.Canvas;
         FlatStyle = FlatStyle.Flat;
-        Size = new Size(58, 32);
+        Size = new Size(82, 44);
         TabStop = true;
         Cursor = Cursors.Hand;
         AccessibleRole = AccessibleRole.CheckButton;
@@ -159,11 +159,11 @@ internal sealed class NavigationButton : Button
             eventArgs.Graphics.FillPath(indicator, path);
         }
 
-        using var iconFont = FluentTheme.Symbols(15f);
-        using var textFont = FluentTheme.Text(10.8f);
+        using var iconFont = FluentTheme.Symbols(18.5f);
+        using var textFont = FluentTheme.Text(13f);
         using var brush = new SolidBrush(FluentTheme.TextPrimary);
-        eventArgs.Graphics.DrawString(Glyph, iconFont, brush, 17, 17);
-        eventArgs.Graphics.DrawString(Text, textFont, brush, 60, 17);
+        eventArgs.Graphics.DrawString(Glyph, iconFont, brush, 17, 14);
+        eventArgs.Graphics.DrawString(Text, textFont, brush, 60, 15);
 
         if (Focused && ShowFocusCues)
         {
