@@ -133,17 +133,24 @@ internal sealed class SettingsForm : Form
         }
 
         Size = new Size(1034, 782);
-        CreateControl();
+        ShowInTaskbar = false;
+        StartPosition = FormStartPosition.Manual;
+        Location = new Point(-32000, -32000);
+        Show();
+        Application.DoEvents();
         PerformLayout();
+        Refresh();
         foreach (Control child in Controls)
         {
             child.CreateControl();
             child.PerformLayout();
+            child.Refresh();
         }
 
         using var bitmap = new Bitmap(Width, Height);
         DrawToBitmap(bitmap, new Rectangle(Point.Empty, Size));
         bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+        Hide();
     }
 
     protected override void Dispose(bool disposing)
