@@ -9,7 +9,7 @@ internal sealed class FluentToggle : CheckBox
     {
         Appearance = Appearance.Button;
         AutoSize = false;
-        BackColor = Color.Transparent;
+        BackColor = FluentTheme.Canvas;
         FlatStyle = FlatStyle.Flat;
         Size = new Size(58, 32);
         TabStop = true;
@@ -31,7 +31,7 @@ internal sealed class FluentToggle : CheckBox
     protected override void OnPaint(PaintEventArgs eventArgs)
     {
         eventArgs.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        eventArgs.Graphics.Clear(Parent?.BackColor ?? FluentTheme.Surface);
+        eventArgs.Graphics.Clear(FluentTheme.Canvas);
 
         var track = new RectangleF(1.5f, 2.5f, Width - 3f, Height - 5f);
         using var trackPath = RoundedRectangle(track, track.Height / 2f);

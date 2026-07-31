@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 namespace PwaDrop.App.Brand;
@@ -58,6 +59,15 @@ internal static class BrandIcon
             right,
             centerY);
         return bitmap;
+    }
+
+    internal static Bitmap CreateBridgeHeroBitmap()
+    {
+        const string resourceName = "PwaDrop.App.Assets.PWADropBridgeHero.png";
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName) ??
+                           throw new InvalidOperationException($"Embedded brand asset {resourceName} was not found.");
+        using var image = Image.FromStream(stream);
+        return new Bitmap(image);
     }
 
     private static GraphicsPath RoundedRectangle(RectangleF bounds, float radius)
