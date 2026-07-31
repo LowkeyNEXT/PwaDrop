@@ -1,6 +1,6 @@
-# PwaDrop brand
+# PWADrop brand
 
-PwaDrop's mark is a bridge between two application boundaries. The two white pillars represent the source and destination; the curved middle stroke represents a file crossing the boundary without a save-and-upload detour.
+PWADrop's mark is a bridge between two application boundaries. The two white pillars represent the source and destination; the curved middle stroke represents a file crossing the boundary without a save-and-upload detour.
 
 ## Palette
 
@@ -17,8 +17,8 @@ Use the blue-to-violet gradient at 45 degrees for the primary mark. Use the flat
 ## Typography and voice
 
 - UI: Segoe UI Variable, falling back to Segoe UI.
-- Product name: **PwaDrop** with a capital `P`, `D`, and no space.
-- Tagline: **Drag from New Outlook. Drop anywhere.**
+- Product name: **PWADrop** with capital `PWA` and `D`, and no space.
+- Tagline: **Drag delayed files. Drop anywhere.**
 - Voice: direct, calm, local-first, and explicit about temporary files.
 
 The generated repository hero is a marketing illustration. The SVG mark is the source of truth for application and package icons.

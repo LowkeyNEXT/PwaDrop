@@ -3,7 +3,7 @@ using PwaDrop.App.Interop;
 
 namespace PwaDrop.App.Drag;
 
-internal sealed class OutlookDragMonitor : IDisposable
+internal sealed class DragSourceMonitor : IDisposable
 {
     private readonly RelayOverlayForm _overlay;
     private readonly Func<IReadOnlyList<IntPtr>> _excludedWindows;
@@ -16,7 +16,7 @@ internal sealed class OutlookDragMonitor : IDisposable
     private bool _thresholdPassed;
     private bool _currentDragPrimed;
 
-    internal OutlookDragMonitor(
+    internal DragSourceMonitor(
         RelayOverlayForm overlay,
         Func<IReadOnlyList<IntPtr>> excludedWindows,
         Action primedDragReleased)
@@ -48,7 +48,7 @@ internal sealed class OutlookDragMonitor : IDisposable
             0);
         if (_hook == IntPtr.Zero)
         {
-            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Unable to monitor New Outlook drags.");
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(), "Unable to monitor supported drag sources.");
         }
     }
 
@@ -111,7 +111,7 @@ internal sealed class OutlookDragMonitor : IDisposable
     private void BeginCandidate(NativeMethods.Point point)
     {
         var window = NativeMethods.WindowFromPoint(point);
-        if (window == IntPtr.Zero || !ProcessClassifier.IsNewOutlookWindow(window))
+        if (window == IntPtr.Zero || !ProcessClassifier.IsSupportedSourceWindow(window))
         {
             _sourceRoot = IntPtr.Zero;
             _sourceProcessId = 0;

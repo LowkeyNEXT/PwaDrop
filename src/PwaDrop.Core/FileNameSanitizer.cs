@@ -16,7 +16,7 @@ public static class FileNameSanitizer
     public static string Sanitize(string? displayName, int fallbackIndex)
     {
         var candidate = string.IsNullOrWhiteSpace(displayName)
-            ? $"PwaDrop item {fallbackIndex + 1}"
+            ? $"PWADrop item {fallbackIndex + 1}"
             : Path.GetFileName(displayName.Trim());
 
         var builder = new StringBuilder(candidate.Length);
@@ -30,7 +30,7 @@ public static class FileNameSanitizer
         candidate = builder.ToString().Trim().TrimEnd('.', ' ');
         if (candidate is "" or "." or "..")
         {
-            candidate = $"PwaDrop item {fallbackIndex + 1}";
+            candidate = $"PWADrop item {fallbackIndex + 1}";
         }
 
         var extension = Path.GetExtension(candidate);
@@ -76,4 +76,3 @@ public static class FileNameSanitizer
         throw new IOException("Unable to allocate a unique temporary file name.");
     }
 }
-
