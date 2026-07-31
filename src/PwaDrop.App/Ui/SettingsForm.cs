@@ -230,7 +230,7 @@ internal sealed class SettingsForm : Form
         {
             Text = "PWADrop",
             AutoSize = true,
-            Font = FluentTheme.Text(11.5f),
+            Font = FluentTheme.Text(13.5f),
             ForeColor = FluentTheme.TextPrimary,
             Location = new Point(66, 17)
         };
@@ -260,17 +260,17 @@ internal sealed class SettingsForm : Form
             Padding = new Padding(14, 28, 14, 22)
         };
 
-        var overview = CreateNavigationButton("Overview", "\uE80F", 28);
-        var compatibility = CreateNavigationButton("Compatibility", "\uE950", 92);
-        var diagnostics = CreateNavigationButton("Diagnostics", "\uE9D9", 156);
+        var overview = CreateNavigationButton("Overview", "\uE80F", 35);
+        var compatibility = CreateNavigationButton("Compatibility", "\uE950", 99);
+        var diagnostics = CreateNavigationButton("Diagnostics", "\uE9D9", 163);
         var separator = new Panel
         {
-            Location = new Point(24, 224),
+            Location = new Point(24, 231),
             Size = new Size(NavigationWidth - 48, 1),
             BackColor = FluentTheme.Stroke,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
-        var about = CreateNavigationButton("About", "\uE946", 244);
+        var about = CreateNavigationButton("About", "\uE946", 251);
 
         navigation.Controls.Add(overview);
         navigation.Controls.Add(compatibility);
@@ -289,20 +289,22 @@ internal sealed class SettingsForm : Form
         out Label statusGlyph)
     {
         var page = CreatePage();
+        page.Padding = new Padding(30, 0, 64, 0);
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 5,
+            RowCount = 6,
             BackColor = Color.Transparent,
             Margin = Padding.Empty,
             Padding = Padding.Empty
         };
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 280));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 130));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         page.Controls.Add(layout);
 
         var hero = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
@@ -317,7 +319,7 @@ internal sealed class SettingsForm : Form
         var heroStatusGlyph = new Label
         {
             Text = "\uF13E",
-            Font = FluentTheme.Symbols(23f),
+            Font = FluentTheme.Symbols(30f),
             ForeColor = FluentTheme.Success,
             AutoSize = true,
             Anchor = AnchorStyles.None,
@@ -326,7 +328,7 @@ internal sealed class SettingsForm : Form
         var heroStatusTitle = new Label
         {
             Text = "Bridge active",
-            Font = FluentTheme.Display(25f, FontStyle.Bold),
+            Font = FluentTheme.Display(31f, FontStyle.Bold),
             ForeColor = FluentTheme.TextPrimary,
             AutoSize = true,
             Anchor = AnchorStyles.None
@@ -334,7 +336,7 @@ internal sealed class SettingsForm : Form
         var heroStatusSubtitle = new Label
         {
             Text = "Drag priming is ready.",
-            Font = FluentTheme.Text(11.5f),
+            Font = FluentTheme.Text(14.5f),
             ForeColor = FluentTheme.TextSecondary,
             AutoSize = true,
             Anchor = AnchorStyles.None
@@ -639,15 +641,17 @@ internal sealed class SettingsForm : Form
             Cursor = Cursors.Hand,
             AccessibleName = title
         };
-        var textLeft = string.IsNullOrEmpty(glyph) ? 4 : 72;
+        var hasGlyph = !string.IsNullOrEmpty(glyph);
+        var textLeft = hasGlyph ? 100 : 34;
+        var titleTop = hasGlyph ? 34 : 25;
         if (!string.IsNullOrEmpty(glyph))
         {
             var icon = new Label
             {
                 Text = glyph,
-                Font = FluentTheme.Symbols(21f),
+                Font = FluentTheme.Symbols(27f),
                 ForeColor = FluentTheme.AccentSecondary,
-                Location = new Point(4, 31),
+                Location = new Point(34, 31),
                 AutoSize = true,
                 AccessibleName = title
             };
@@ -657,24 +661,24 @@ internal sealed class SettingsForm : Form
         var titleLabel = new Label
         {
             Text = title,
-            Font = FluentTheme.Text(11f, FontStyle.Bold),
+            Font = FluentTheme.Text(13.5f, FontStyle.Bold),
             ForeColor = FluentTheme.TextPrimary,
-            Location = new Point(textLeft, 25),
+            Location = new Point(textLeft, titleTop),
             AutoSize = true
         };
         var descriptionLabel = new Label
         {
             Text = description,
-            Font = FluentTheme.Text(9.8f),
+            Font = FluentTheme.Text(12f),
             ForeColor = FluentTheme.TextSecondary,
-            Location = new Point(textLeft + 2, 55),
+            Location = new Point(textLeft + 2, titleTop + 30),
             Size = new Size(520, 32),
             AutoEllipsis = true,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var rowToggle = new FluentToggle
         {
-            Location = new Point(row.Width - 66, 34),
+            Location = new Point(row.Width - 90, 31),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             AccessibleName = title,
             AccessibleDescription = description
