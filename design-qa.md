@@ -5,8 +5,9 @@
 - Source visual truth: `/Users/brenrid/.codex/generated_images/019fae1c-ba14-74a2-8c35-1a397abec051/exec-9dd2a048-0784-4cf0-a1b5-402cd94ea1dc.png`
 - Normalized source crop: `artifacts/ci/design-qa/reference-window.png`
 - Rendered implementation: `docs/images/PWADrop-settings.png`
-- Side-by-side comparison input: `artifacts/ci/design-qa/compare-final-30593442057.png`
-- Windows CI evidence: run `30593442057`, artifact `PWADrop-settings-preview`
+- Side-by-side comparison input: `artifacts/ci/design-qa/compare-final-30594871228.png`
+- Windows CI evidence: run `30594871228`, artifact `PWADrop-settings-preview`
+- Regression captures: `PWADrop-settings.png` (1034 × 782), `PWADrop-settings-min.png` (900 × 700), and `PWADrop-about.png` (1034 × 782)
 - Viewport/state: 1034 × 782 physical pixels, Windows 11 dark theme, Overview selected, bridge enabled, startup disabled, notifications enabled
 - Density normalization: source application window was cropped from the 1488 × 1058 mock to 1034 × 782; the native implementation was rendered at 1034 × 782 with the CI runner at 1× capture density. No resampling was applied to either comparison half.
 
@@ -20,7 +21,7 @@ A separate crop was not needed because the equal-size 2068 × 782 side-by-side i
 
 ## Required fidelity surfaces
 
-- Fonts and typography: both use Segoe UI Variable Display/Text. Display size, setting-title weight, line wrapping, and hierarchy align; no clipping or truncation is visible.
+- Fonts and typography: both use Segoe UI Variable Display/Text. Display size, setting-title weight, line wrapping, and hierarchy align. The standard viewport is untruncated; the minimum-width viewport uses intentional ellipses rather than allowing text beneath the toggles.
 - Spacing and layout rhythm: navigation, hero, dividers, row heights, text insets, icon columns, and toggle alignment match the selected composition.
 - Colors and visual tokens: midnight surfaces, blue-violet brand treatment, white/secondary text, green active state, and subdued strokes are consistent. CI `DrawToBitmap` captures the solid dark fallback rather than the live DWM backdrop.
 - Image quality and asset fidelity: the embedded high-resolution bridge bitmap has a validated alpha channel and is rendered without stretching or a chroma fringe. The application and package marks use the existing source-of-truth brand asset.
@@ -45,6 +46,11 @@ A separate crop was not needed because the equal-size 2068 × 782 side-by-side i
    - P2: the notification description did not match the approved source-neutral sentence.
    - Fix: use `Get notified when the bridge is active or has issues.` verbatim.
    - Post-fix evidence: CI run `30593442057` shows the corrected final copy.
+5. Resize and About-page regression — blocked
+   - P1: Dock-based sibling ordering could briefly paint the content host over the navigation pane while the native form resized or changed DPI.
+   - P2: independently positioned About labels could place a long informational version beneath the `PWADrop` title, and narrow setting descriptions could clip abruptly.
+   - Fixes: place title bar, navigation, and content in fixed table-layout tracks; enable DPI autoscaling; place the About identity in a two-row grid; present the semantic version without build metadata; and use intentional ellipses at the minimum supported width.
+   - Post-fix evidence: CI run `30594871228` passes the 1034 × 782 Overview, 900 × 700 minimum-size Overview, and 1034 × 782 About captures with no cross-column or title/version overlap.
 
 ## Findings
 
@@ -64,6 +70,7 @@ No actionable P0, P1, or P2 findings remain.
 - [x] Functional navigation and keyboard-focusable toggles
 - [x] Correct minimize, maximize/restore, and close-to-notification-area behavior
 - [x] Equal-size native screenshot comparison
+- [x] Minimum-size and About-page overlap regression captures
 - [x] Windows build, unit tests, and primed original-drag self-test
 
 final result: passed
