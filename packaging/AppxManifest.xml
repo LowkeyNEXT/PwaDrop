@@ -6,14 +6,14 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap desktop rescap">
   <Identity
-    Name="RiddleNext.PwaDrop"
+    Name="__IDENTITY_NAME__"
     Publisher="__PUBLISHER__"
     Version="__VERSION__"
     ProcessorArchitecture="x64" />
   <Properties>
-    <DisplayName>PwaDrop</DisplayName>
-    <PublisherDisplayName>PwaDrop contributors</PublisherDisplayName>
-    <Description>Drag from New Outlook and drop into normal Windows and browser file targets.</Description>
+    <DisplayName>PWADrop</DisplayName>
+    <PublisherDisplayName>__PUBLISHER_DISPLAY_NAME__</PublisherDisplayName>
+    <Description>Drag delayed files between modern Windows applications.</Description>
     <Logo>Assets\StoreLogo.png</Logo>
   </Properties>
   <Resources>
@@ -25,8 +25,8 @@
   <Applications>
     <Application Id="PwaDrop" Executable="PwaDrop.exe" EntryPoint="Windows.FullTrustApplication">
       <uap:VisualElements
-        DisplayName="PwaDrop"
-        Description="Drag from New Outlook. Drop anywhere."
+        DisplayName="PWADrop"
+        Description="Drag delayed files between modern Windows applications."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png" />
@@ -35,7 +35,7 @@
           Category="windows.startupTask"
           Executable="PwaDrop.exe"
           EntryPoint="Windows.FullTrustApplication">
-          <desktop:StartupTask TaskId="PwaDropStartup" Enabled="false" DisplayName="PwaDrop" />
+          <desktop:StartupTask TaskId="PWADropStartup" Enabled="false" DisplayName="PWADrop" />
         </desktop:Extension>
       </Extensions>
     </Application>
@@ -44,4 +44,3 @@
     <rescap:Capability Name="runFullTrust" />
   </Capabilities>
 </Package>
-

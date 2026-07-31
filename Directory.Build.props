@@ -6,9 +6,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <Authors>PwaDrop contributors</Authors>
+    <Authors>PWADrop contributors</Authors>
     <Company>Riddle Next LLC</Company>
-    <Copyright>Copyright (c) 2026 PwaDrop contributors</Copyright>
+    <Copyright>Copyright (c) 2026 PWADrop contributors</Copyright>
     <Version>0.1.0-alpha.4</Version>
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <FileVersion>0.1.0.4</FileVersion>

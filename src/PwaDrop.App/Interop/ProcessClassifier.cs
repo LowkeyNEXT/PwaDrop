@@ -1,11 +1,12 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using PwaDrop.Core;
 
 namespace PwaDrop.App.Interop;
 
 internal static class ProcessClassifier
 {
-    internal static bool IsNewOutlookWindow(IntPtr hwnd)
+    internal static bool IsSupportedSourceWindow(IntPtr hwnd)
     {
         var root = NativeMethods.GetAncestor(hwnd, NativeMethods.GaRoot);
         if (root == IntPtr.Zero)
@@ -14,10 +15,10 @@ internal static class ProcessClassifier
         }
 
         NativeMethods.GetWindowThreadProcessId(root, out var processId);
-        return IsNewOutlookProcess(processId);
+        return IsSupportedSourceProcess(processId);
     }
 
-    internal static bool IsNewOutlookProcess(uint processId)
+    internal static bool IsSupportedSourceProcess(uint processId)
     {
         if (processId == 0)
         {
@@ -38,7 +39,7 @@ internal static class ProcessClassifier
             return false;
         }
 
-        if (IsOutlookExecutable(directName))
+        if (SupportedSourceProcess.IsSupported(directName))
         {
             return true;
         }
@@ -58,7 +59,7 @@ internal static class ProcessClassifier
             }
 
             var name = Path.GetFileNameWithoutExtension(process.Executable);
-            if (IsOutlookExecutable(name))
+            if (SupportedSourceProcess.IsSupported(name))
             {
                 return true;
             }
@@ -68,11 +69,6 @@ internal static class ProcessClassifier
 
         return false;
     }
-
-    private static bool IsOutlookExecutable(string name) =>
-        name.Equals("olk", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("Microsoft.OutlookForWindows", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("PwaDrop.DragHarness", StringComparison.OrdinalIgnoreCase);
 
     private static Dictionary<uint, ProcessInfo> SnapshotProcessTree()
     {
