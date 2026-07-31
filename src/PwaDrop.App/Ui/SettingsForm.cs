@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 using PwaDrop.App.Brand;
 using PwaDrop.App.Interop;
 using PwaDrop.Core;
@@ -507,7 +508,7 @@ internal sealed class SettingsForm : Form
         };
         var version = new Label
         {
-            Text = $"Version {Application.ProductVersion}",
+            Text = $"Version {GetDisplayVersion()}",
             Font = FluentTheme.Text(10.5f),
             ForeColor = FluentTheme.TextSecondary,
             Dock = DockStyle.Fill,
@@ -540,6 +541,7 @@ internal sealed class SettingsForm : Form
         };
         var projectButton = CreateActionButton("Open project on GitHub", (_, _) =>
             Process.Start(new ProcessStartInfo("https://github.com/LowkeyNEXT/PwaDrop") { UseShellExecute = true }));
+        projectButton.Width = 184;
         projectButton.Location = new Point(48, 292);
 
         page.Controls.Add(identity);
@@ -583,7 +585,7 @@ internal sealed class SettingsForm : Form
             ForeColor = FluentTheme.TextSecondary,
             Location = new Point(47, 76),
             Size = new Size(650, 44),
-            AutoEllipsis = true,
+            AutoEllipsis = false,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         header.Controls.Add(titleLabel);
@@ -726,8 +728,8 @@ internal sealed class SettingsForm : Form
             Font = FluentTheme.Text(12f),
             ForeColor = FluentTheme.TextSecondary,
             Location = new Point(textLeft + 2, titleTop + 30),
-            Size = new Size(520, 32),
-            AutoEllipsis = true,
+            Size = new Size(520, 38),
+            AutoEllipsis = false,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var rowToggle = new FluentToggle
@@ -896,6 +898,18 @@ internal sealed class SettingsForm : Form
         }
 
         Process.Start(new ProcessStartInfo(createFile ? "notepad.exe" : "explorer.exe", path) { UseShellExecute = true });
+    }
+
+    private static string GetDisplayVersion()
+    {
+        var informationalVersion = typeof(SettingsForm).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        var version = string.IsNullOrWhiteSpace(informationalVersion)
+            ? Application.ProductVersion
+            : informationalVersion;
+        var buildMetadata = version.IndexOf('+');
+        return buildMetadata >= 0 ? version[..buildMetadata] : version;
     }
 
     private sealed class SettingRow(bool drawBottomBorder) : Panel
