@@ -121,7 +121,7 @@ internal sealed class VirtualFileExtractor
         DragPayloadKind payloadKind,
         IDataObjectAsyncCapability asyncOperation)
     {
-        // Returning from IDropTarget.Drop lets Outlook unwind its source drag loop.
+        // Returning from IDropTarget.Drop lets the source application unwind its drag loop.
         // Continue on a pool thread only after that loop has had time to finish.
         await Task.Delay(OriginalDropUnwindDelay).ConfigureAwait(false);
         return ExtractCore(dataObject, payloadKind, asyncOperation, asyncStarted: true);

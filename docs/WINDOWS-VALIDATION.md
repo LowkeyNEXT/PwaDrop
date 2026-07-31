@@ -8,22 +8,30 @@ Record results in a pull request before marking an installer as beta. Never test
 - Current stable New Outlook and WebView2 Runtime
 - Current stable Edge and Chrome
 - At least 5 GB free in `%LOCALAPPDATA%`
-- PwaDrop built in `Release` configuration at medium integrity
+- PWADrop built in `Release` configuration at medium integrity
 
 ## Gate 1: deterministic harness
 
-1. Start PwaDrop and confirm the tray status is **Bridge active**.
+1. Start PWADrop and confirm the tray status is **Bridge active**.
 2. Start `PwaDrop.DragHarness`.
 3. Drag the delayed `CF_HDROP` source card onto the physical target card.
 4. Confirm exactly `test-conversation.eml` and `invoice.pdf` appear with non-zero sizes.
 5. Confirm the harness remains responsive and the drop completes as one continuous mouse gesture.
 6. Repeat 20 times, including after moving the windows across monitors with different scaling.
 7. Cancel five drags with Escape and confirm no target drop and no stale overlay.
-8. Pause PwaDrop and confirm the harness target rejects the virtual source.
+8. Pause PWADrop and confirm the harness target rejects the virtual source.
 
-Pass criterion: 20/20 original-drag handoffs, 5/5 cancellations, no extra click, no cursor jump, no stuck transparent window, and no PwaDrop cache session.
+Pass criterion: 20/20 original-drag handoffs, 5/5 cancellations, no extra click, no cursor jump, no stuck transparent window, and no PWADrop cache session.
 
-## Gate 2: New Outlook
+## Gate 2: desktop .NET targets
+
+1. Run `PwaDrop.DragHarness` and complete five drops onto its WinForms target.
+2. Run `PwaDrop.WpfDropTarget` and complete five drops from the harness source onto its WPF target.
+3. Repeat both sets with a multi-file payload and on a monitor using non-100% scaling.
+
+Pass criterion: both targets receive ordinary physical file paths and remain responsive; neither target needs a PWADrop SDK, extension, or custom data format.
+
+## Gate 3: production source apps
 
 Test each row with one email, multiple selected emails, one attachment, and multiple attachments:
 
@@ -37,7 +45,7 @@ Test each row with one email, multiple selected emails, one attachment, and mult
 
 Also test duplicate names, Unicode, shared mailbox items, an attachment over 10 MB, offline mode, insufficient disk space, and a destination running as administrator.
 
-## Gate 3: privacy and cleanup
+## Gate 4: privacy and cleanup
 
 - Confirm async Outlook and harness drags do not create a session under `%LOCALAPPDATA%\PwaDrop\Cache`.
 - Exercise the legacy descriptor fallback separately and confirm cached files receive `Zone.Identifier` on NTFS.
@@ -47,4 +55,4 @@ Also test duplicate names, Unicode, shared mailbox items, an attachment over 10 
 
 ## Browser fixture
 
-Open `tests/browser-drop-target/index.html` in Edge or Chrome. Its drop handler logs `event.dataTransfer.files` names, sizes, and types and contains no PwaDrop-specific integration.
+Open `tests/browser-drop-target/index.html` in Edge or Chrome. Its drop handler logs `event.dataTransfer.files` names, sizes, and types and contains no PWADrop-specific integration.
