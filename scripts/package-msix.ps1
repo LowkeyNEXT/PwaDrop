@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [string]$Version = "0.1.0.0",
+    [string]$IdentityName = "RiddleNext.PWADrop",
     [string]$Publisher = "CN=PwaDrop Development",
+    [string]$PublisherDisplayName = "Riddle Next LLC",
     [string]$CertificatePath,
     [string]$CertificatePassword
 )
@@ -30,7 +32,7 @@ Copy-Item "$publish\*" $stage -Recurse
 Copy-Item "$root\packaging\Assets" "$stage\Assets" -Recurse
 
 $manifest = Get-Content "$root\packaging\AppxManifest.xml" -Raw
-$manifest = $manifest.Replace("__VERSION__", $Version).Replace("__PUBLISHER__", $Publisher)
+$manifest = $manifest.Replace("__VERSION__", $Version).Replace("__IDENTITY_NAME__", $IdentityName).Replace("__PUBLISHER__", $Publisher).Replace("__PUBLISHER_DISPLAY_NAME__", $PublisherDisplayName)
 Set-Content (Join-Path $stage "AppxManifest.xml") $manifest -Encoding UTF8
 
 $kitsRoot = Join-Path ${env:ProgramFiles(x86)} "Windows Kits\10\bin"

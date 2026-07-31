@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using Microsoft.Win32;
+using System.Runtime.InteropServices;
 using PwaDrop.App.Brand;
 using PwaDrop.App.Diagnostics;
 using PwaDrop.App.Drag;
@@ -12,8 +12,6 @@ namespace PwaDrop.App;
 
 internal sealed class PwaDropApplicationContext : ApplicationContext
 {
-    private const string StartupRegistryPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string StartupValueName = "PwaDrop";
     private readonly string _dataPath;
     private readonly string _settingsPath;
     private readonly DiagnosticLog _diagnostics;
@@ -376,8 +374,9 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         });
     }
 
-    private void ApplySettings(AppSettings settings, bool persist = true)
+    private async void ApplySettings(AppSettings settings, bool persist = true)
     {
+        var startupChanged = persist && settings.StartWithWindows != _settings.StartWithWindows;
         _settings = settings;
 
         if (settings.Enabled && !_monitor.IsRunning)
@@ -399,9 +398,28 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
 
         _enabledMenuItem.Checked = _settings.Enabled;
         _enabledMenuItem.Text = "Enable drag bridge";
-        ConfigureStartup(_settings.StartWithWindows);
         _settingsForm?.ApplySettings(_settings);
         SetStatus(_settings.Enabled ? "Bridge active" : "Bridge paused");
+        if (startupChanged)
+        {
+            try
+            {
+                var enabled = await StartupRegistration.SetEnabledAsync(_settings.StartWithWindows);
+                if (enabled != _settings.StartWithWindows)
+                {
+                    _settings = _settings with { StartWithWindows = enabled };
+                    _settingsForm?.ApplySettings(_settings);
+                    ShowError("Windows did not allow PWADrop to change its startup setting.", 0);
+                }
+            }
+            catch (Exception exception) when (exception is UnauthorizedAccessException or COMException)
+            {
+                _settings = _settings with { StartWithWindows = false };
+                _settingsForm?.ApplySettings(_settings);
+                ShowError("Windows did not allow PWADrop to change its startup setting.", exception.HResult);
+            }
+        }
+
         if (persist)
         {
             _settings.Save(_settingsPath);
@@ -454,27 +472,6 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         }
 
         Process.Start(new ProcessStartInfo("notepad.exe", _diagnostics.Path) { UseShellExecute = true });
-    }
-
-    private static void ConfigureStartup(bool enabled)
-    {
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(StartupRegistryPath, writable: true) ??
-                            Registry.CurrentUser.CreateSubKey(StartupRegistryPath, writable: true);
-            if (enabled)
-            {
-                key.SetValue(StartupValueName, $"\"{Application.ExecutablePath}\"");
-            }
-            else
-            {
-                key.DeleteValue(StartupValueName, throwOnMissingValue: false);
-            }
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Managed devices may deny the Run key. The UI remains usable manually.
-        }
     }
 
     private void Exit()

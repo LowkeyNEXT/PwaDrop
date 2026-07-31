@@ -2,7 +2,7 @@
 
 ## 0.1 — MVP
 
-- New Outlook process detection
+- Chromium, installed-PWA, and WebView2 source detection
 - Original-drag priming for Chromium asynchronous `CF_HDROP`
 - Safe temporary cache and replay fallback for legacy virtual-file descriptors
 - Tray/settings experience and branded MSIX setup
@@ -10,7 +10,7 @@
 
 ## 0.2 — Compatibility beta
 
-- Complete Windows/New Outlook/Edge/Chrome/ServiceNow validation
+- Complete Windows/Edge/Chrome/WebView2/ServiceNow validation
 - Progress UI for slow files and explicit cancellation
 - Redacted diagnostic bundle
 - Signed AppInstaller update feed
@@ -18,7 +18,7 @@
 
 ## Later
 
-- Outlook on the web and installed browser PWAs
+- Broader source-specific compatibility adapters
 - ARM64 builds
 - Teams, OneDrive, SharePoint, Gmail, and Slack source adapters
 - Enterprise policy surface for startup, cache lifetime, and diagnostics
