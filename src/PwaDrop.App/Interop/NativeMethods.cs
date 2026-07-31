@@ -10,6 +10,7 @@ internal static class NativeMethods
     internal const int WmMouseMove = 0x0200;
     internal const int WmLButtonDown = 0x0201;
     internal const int WmLButtonUp = 0x0202;
+    internal const int WmNcHitTest = 0x0084;
     internal const int VkLButton = 0x01;
     internal const int GaRoot = 2;
     internal const int SwpNoActivate = 0x0010;
@@ -17,6 +18,18 @@ internal static class NativeMethods
     internal const int WsExToolWindow = 0x00000080;
     internal const int WsExNoActivate = 0x08000000;
     internal const int DwmwaUseImmersiveDarkMode = 20;
+    internal const int DwmwaWindowCornerPreference = 33;
+    internal const int DwmwaSystemBackdropType = 38;
+    internal const int HtClient = 1;
+    internal const int HtCaption = 2;
+    internal const int HtLeft = 10;
+    internal const int HtRight = 11;
+    internal const int HtTop = 12;
+    internal const int HtTopLeft = 13;
+    internal const int HtTopRight = 14;
+    internal const int HtBottom = 15;
+    internal const int HtBottomLeft = 16;
+    internal const int HtBottomRight = 17;
     internal const uint DropEffectNone = 0;
     internal const uint DropEffectCopy = 1;
     internal const uint DragDropSCancel = 0x00040101;

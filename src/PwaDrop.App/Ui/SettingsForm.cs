@@ -7,100 +7,86 @@ namespace PwaDrop.App.Ui;
 
 internal sealed class SettingsForm : Form
 {
-    private readonly CheckBox _enabledToggle;
-    private readonly CheckBox _startupToggle;
-    private readonly Label _status;
-    private readonly Label _cachePath;
+    private const int TitleBarHeight = 54;
+    private const int NavigationWidth = 258;
+    private readonly FluentToggle _enabledToggle;
+    private readonly FluentToggle _startupToggle;
+    private readonly FluentToggle _notificationsToggle;
+    private readonly Label _statusTitle;
+    private readonly Label _statusSubtitle;
+    private readonly Label _statusGlyph;
+    private Button _maximizeButton = null!;
+    private readonly Dictionary<NavigationButton, Control> _pages = [];
+    private readonly Bitmap _brandBitmap;
     private bool _updating;
 
-    internal SettingsForm(AppSettings settings, string cachePath)
+    internal SettingsForm(AppSettings settings, string cachePath, string diagnosticsPath)
     {
-        Text = "PwaDrop";
+        Text = "PWADrop";
+        AccessibleName = "PWADrop settings";
         Icon = BrandIcon.CreateIcon();
         StartPosition = FormStartPosition.CenterScreen;
-        MinimumSize = new Size(600, 500);
-        Size = new Size(680, 560);
-        BackColor = Color.FromArgb(247, 248, 252);
-        ForeColor = Color.FromArgb(24, 29, 43);
-        Font = new Font("Segoe UI Variable Text", 10f);
+        FormBorderStyle = FormBorderStyle.None;
+        MinimumSize = new Size(900, 640);
+        Size = new Size(1034, 782);
+        BackColor = FluentTheme.Canvas;
+        ForeColor = FluentTheme.TextPrimary;
+        Font = FluentTheme.Text(10f);
+        KeyPreview = true;
+        _brandBitmap = BrandIcon.CreateBitmap(96);
 
-        var header = new BrandHeader { Dock = DockStyle.Top, Height = 132 };
-        var content = new TableLayoutPanel
+        var body = new Panel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(32, 24, 32, 24),
-            ColumnCount = 1,
-            RowCount = 4,
-            BackColor = BackColor
+            BackColor = FluentTheme.Canvas
         };
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
-        content.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        content.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
-        Controls.Add(content);
-        Controls.Add(header);
-        header.BringToFront();
+        var titleBar = CreateTitleBar();
+        var navigation = CreateNavigation();
+        var contentHost = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = FluentTheme.Canvas
+        };
 
-        _enabledToggle = CreateToggle("Enable drag bridge", "Prime New Outlook downloads while preserving the original drag.");
-        _startupToggle = CreateToggle("Start with Windows", "Keep PwaDrop ready in the notification area after sign-in.");
-        content.Controls.Add(WrapCard(_enabledToggle), 0, 0);
-        content.Controls.Add(WrapCard(_startupToggle), 0, 1);
+        Controls.Add(body);
+        Controls.Add(titleBar);
+        body.Controls.Add(contentHost);
+        body.Controls.Add(navigation);
 
-        var privacyCard = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Padding = new Padding(20, 16, 20, 12), Margin = new Padding(0, 8, 0, 8) };
-        var privacyTitle = new Label
-        {
-            Text = "Local and private",
-            AutoSize = true,
-            Font = new Font(Font, FontStyle.Bold),
-            Location = new Point(20, 16)
-        };
-        var privacyBody = new Label
-        {
-            Text = "New Outlook stays responsible for producing async files directly to the destination. PwaDrop does not read their paths or contents. No telemetry or mailbox login.",
-            AutoEllipsis = true,
-            Location = new Point(20, 44),
-            Size = new Size(560, 52),
-            ForeColor = Color.FromArgb(91, 98, 115),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-        _cachePath = new Label
-        {
-            Text = cachePath,
-            AutoEllipsis = true,
-            Location = new Point(20, 104),
-            Size = new Size(560, 24),
-            ForeColor = Color.FromArgb(91, 98, 115),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-        var openCache = CreateButton("Open cache", (_, _) => OpenCache(cachePath));
-        openCache.Location = new Point(20, 140);
-        privacyCard.Controls.Add(privacyTitle);
-        privacyCard.Controls.Add(privacyBody);
-        privacyCard.Controls.Add(_cachePath);
-        privacyCard.Controls.Add(openCache);
-        content.Controls.Add(privacyCard, 0, 2);
+        var overview = CreateOverviewPage(out _enabledToggle, out _startupToggle, out _notificationsToggle, out _statusTitle, out _statusSubtitle, out _statusGlyph);
+        var compatibility = CreateCompatibilityPage();
+        var diagnostics = CreateDiagnosticsPage(cachePath, diagnosticsPath);
+        var about = CreateAboutPage();
 
-        var footer = new Panel { Dock = DockStyle.Fill };
-        _status = new Label
+        contentHost.Controls.Add(overview);
+        contentHost.Controls.Add(compatibility);
+        contentHost.Controls.Add(diagnostics);
+        contentHost.Controls.Add(about);
+
+        var navButtons = navigation.Controls.OfType<NavigationButton>().OrderBy(button => button.Top).ToArray();
+        _pages[navButtons[0]] = overview;
+        _pages[navButtons[1]] = compatibility;
+        _pages[navButtons[2]] = diagnostics;
+        _pages[navButtons[3]] = about;
+        foreach (var button in navButtons)
         {
-            Text = "Ready",
-            AutoSize = true,
-            ForeColor = Color.FromArgb(72, 82, 255),
-            Location = new Point(0, 17),
-            Font = new Font(Font, FontStyle.Bold)
-        };
-        var close = CreateButton("Done", (_, _) => Hide());
-        close.Dock = DockStyle.Right;
-        footer.Controls.Add(_status);
-        footer.Controls.Add(close);
-        content.Controls.Add(footer, 0, 3);
+            button.Click += (_, _) => SelectPage(button);
+        }
+
+        SelectPage(navButtons[0]);
 
         _enabledToggle.CheckedChanged += ToggleChanged;
         _startupToggle.CheckedChanged += ToggleChanged;
+        _notificationsToggle.CheckedChanged += ToggleChanged;
         FormClosing += (_, eventArgs) =>
         {
             eventArgs.Cancel = true;
             Hide();
+        };
+        Resize += (_, _) =>
+        {
+            _maximizeButton.Text = WindowState == FormWindowState.Maximized ? "\uE923" : "\uE922";
+            Padding = WindowState == FormWindowState.Maximized ? new Padding(7) : Padding.Empty;
         };
 
         ApplySettings(settings);
@@ -113,20 +99,667 @@ internal sealed class SettingsForm : Form
         _updating = true;
         _enabledToggle.Checked = settings.Enabled;
         _startupToggle.Checked = settings.StartWithWindows;
+        _notificationsToggle.Checked = settings.ShowStatusNotifications;
         _updating = false;
         SetStatus(settings.Enabled ? "Bridge active" : "Bridge paused");
     }
 
     internal void SetStatus(string status)
     {
-        _status.Text = status;
+        if (InvokeRequired)
+        {
+            BeginInvoke(() => SetStatus(status));
+            return;
+        }
+
+        var active = status.Equals("Bridge active", StringComparison.OrdinalIgnoreCase);
+        var paused = status.Equals("Bridge paused", StringComparison.OrdinalIgnoreCase);
+        _statusTitle.Text = status;
+        _statusSubtitle.Text = active
+            ? "Drag priming is ready."
+            : paused
+                ? "Enable the bridge when you are ready."
+                : "PWADrop is handling the current drag.";
+        _statusGlyph.Text = active ? "\uE73E" : paused ? "\uE769" : "\uE895";
+        _statusGlyph.ForeColor = active ? FluentTheme.Success : paused ? FluentTheme.Warning : FluentTheme.Accent;
     }
 
-    protected override void OnHandleCreated(EventArgs e)
+    internal void RenderTo(string path)
     {
-        base.OnHandleCreated(e);
-        var darkMode = 0;
-        NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DwmwaUseImmersiveDarkMode, ref darkMode, sizeof(int));
+        var directory = Path.GetDirectoryName(Path.GetFullPath(path));
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        Size = new Size(1034, 782);
+        CreateControl();
+        PerformLayout();
+        foreach (Control child in Controls)
+        {
+            child.CreateControl();
+            child.PerformLayout();
+        }
+
+        using var bitmap = new Bitmap(Width, Height);
+        DrawToBitmap(bitmap, new Rectangle(Point.Empty, Size));
+        bitmap.Save(path, System.Drawing.Imaging.ImageFormat.Png);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _brandBitmap.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    protected override void OnHandleCreated(EventArgs eventArgs)
+    {
+        base.OnHandleCreated(eventArgs);
+        var enabled = 1;
+        var corner = 2;
+        var backdrop = 2;
+        NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DwmwaUseImmersiveDarkMode, ref enabled, sizeof(int));
+        NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DwmwaWindowCornerPreference, ref corner, sizeof(int));
+        NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DwmwaSystemBackdropType, ref backdrop, sizeof(int));
+    }
+
+    protected override bool ProcessCmdKey(ref Message message, Keys keyData)
+    {
+        if (keyData == Keys.Escape)
+        {
+            Hide();
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref message, keyData);
+    }
+
+    protected override void WndProc(ref Message message)
+    {
+        if (message.Msg == NativeMethods.WmNcHitTest)
+        {
+            base.WndProc(ref message);
+            if ((int)message.Result == NativeMethods.HtClient)
+            {
+                var screenPoint = new Point(
+                    unchecked((short)((long)message.LParam & 0xFFFF)),
+                    unchecked((short)(((long)message.LParam >> 16) & 0xFFFF)));
+                var point = PointToClient(screenPoint);
+                message.Result = (IntPtr)HitTest(point);
+            }
+
+            return;
+        }
+
+        base.WndProc(ref message);
+    }
+
+    private Panel CreateTitleBar()
+    {
+        var titleBar = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = TitleBarHeight,
+            BackColor = FluentTheme.Navigation
+        };
+
+        var logo = new PictureBox
+        {
+            Image = BrandIcon.CreateBitmap(34),
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Location = new Point(20, 10),
+            Size = new Size(34, 34),
+            AccessibleName = "PWADrop logo",
+            TabStop = false
+        };
+        var productName = new Label
+        {
+            Text = "PWADrop",
+            AutoSize = true,
+            Font = FluentTheme.Text(11.5f),
+            ForeColor = FluentTheme.TextPrimary,
+            Location = new Point(66, 17)
+        };
+
+        var closeButton = CreateWindowButton("\uE8BB", "Close", (_, _) => Hide(), true);
+        _maximizeButton = CreateWindowButton("\uE922", "Maximize or restore", (_, _) => ToggleMaximize());
+        var minimizeButton = CreateWindowButton("\uE921", "Minimize", (_, _) => WindowState = FormWindowState.Minimized);
+        closeButton.Dock = DockStyle.Right;
+        _maximizeButton.Dock = DockStyle.Right;
+        minimizeButton.Dock = DockStyle.Right;
+
+        titleBar.Controls.Add(closeButton);
+        titleBar.Controls.Add(_maximizeButton);
+        titleBar.Controls.Add(minimizeButton);
+        titleBar.Controls.Add(productName);
+        titleBar.Controls.Add(logo);
+        return titleBar;
+    }
+
+    private static Panel CreateNavigation()
+    {
+        var navigation = new Panel
+        {
+            Dock = DockStyle.Left,
+            Width = NavigationWidth,
+            BackColor = FluentTheme.Navigation,
+            Padding = new Padding(14, 28, 14, 22)
+        };
+
+        var overview = CreateNavigationButton("Overview", "\uE80F", 28);
+        var compatibility = CreateNavigationButton("Compatibility", "\uE950", 92);
+        var diagnostics = CreateNavigationButton("Diagnostics", "\uE9D9", 156);
+        var separator = new Panel
+        {
+            Location = new Point(24, 224),
+            Size = new Size(NavigationWidth - 48, 1),
+            BackColor = FluentTheme.Stroke,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var about = CreateNavigationButton("About", "\uE946", 244);
+
+        navigation.Controls.Add(overview);
+        navigation.Controls.Add(compatibility);
+        navigation.Controls.Add(diagnostics);
+        navigation.Controls.Add(separator);
+        navigation.Controls.Add(about);
+        return navigation;
+    }
+
+    private Control CreateOverviewPage(
+        out FluentToggle enabledToggle,
+        out FluentToggle startupToggle,
+        out FluentToggle notificationsToggle,
+        out Label statusTitle,
+        out Label statusSubtitle,
+        out Label statusGlyph)
+    {
+        var page = CreatePage();
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 5,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
+        page.Controls.Add(layout);
+
+        var hero = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+        var brand = new PictureBox
+        {
+            Image = _brandBitmap,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Size = new Size(108, 108),
+            Anchor = AnchorStyles.None,
+            AccessibleName = "PWADrop bridge mark"
+        };
+        var heroStatusGlyph = new Label
+        {
+            Text = "\uE73E",
+            Font = FluentTheme.Symbols(23f),
+            ForeColor = FluentTheme.Success,
+            AutoSize = true,
+            Anchor = AnchorStyles.None,
+            AccessibleName = "Bridge status"
+        };
+        var heroStatusTitle = new Label
+        {
+            Text = "Bridge active",
+            Font = FluentTheme.Display(25f, FontStyle.Bold),
+            ForeColor = FluentTheme.TextPrimary,
+            AutoSize = true,
+            Anchor = AnchorStyles.None
+        };
+        var heroStatusSubtitle = new Label
+        {
+            Text = "Drag priming is ready.",
+            Font = FluentTheme.Text(11.5f),
+            ForeColor = FluentTheme.TextSecondary,
+            AutoSize = true,
+            Anchor = AnchorStyles.None
+        };
+
+        hero.Controls.Add(brand);
+        hero.Controls.Add(heroStatusGlyph);
+        hero.Controls.Add(heroStatusTitle);
+        hero.Controls.Add(heroStatusSubtitle);
+        hero.Resize += (_, _) => LayoutHero(hero, brand, heroStatusGlyph, heroStatusTitle, heroStatusSubtitle);
+        layout.Controls.Add(hero, 0, 0);
+        layout.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = FluentTheme.Stroke }, 0, 1);
+
+        var enabledRow = CreateSettingRow(
+            "Enable drag bridge",
+            "Prepare delayed files for reliable dropping into apps.",
+            null,
+            out enabledToggle);
+        var startupRow = CreateSettingRow(
+            "Start with Windows",
+            "Launch PWADrop automatically when you sign in.",
+            "\uE7E8",
+            out startupToggle);
+        var notificationsRow = CreateSettingRow(
+            "Show status notifications",
+            "Get notified when the bridge completes a drop or has an issue.",
+            "\uEA8F",
+            out notificationsToggle,
+            drawBottomBorder: false);
+        layout.Controls.Add(enabledRow, 0, 2);
+        layout.Controls.Add(startupRow, 0, 3);
+        layout.Controls.Add(notificationsRow, 0, 4);
+        statusGlyph = heroStatusGlyph;
+        statusTitle = heroStatusTitle;
+        statusSubtitle = heroStatusSubtitle;
+        return page;
+    }
+
+    private static Control CreateCompatibilityPage()
+    {
+        var page = CreatePage();
+        var header = CreatePageHeader(
+            "Compatibility",
+            "PWADrop bridges delayed file drags from supported Chromium and WebView2 apps into ordinary Windows drop targets.");
+        page.Controls.Add(header);
+
+        var cards = new TableLayoutPanel
+        {
+            Location = new Point(44, 142),
+            Size = new Size(680, 392),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            ColumnCount = 1,
+            RowCount = 3,
+            BackColor = Color.Transparent
+        };
+        cards.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
+        cards.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
+        cards.RowStyles.Add(new RowStyle(SizeType.Percent, 33.334f));
+        cards.Controls.Add(CreateCompatibilityCard("\uE774", "Chromium and WebView2 sources", "Edge, Chrome, installed browser apps, and recognized WebView2 hosts."), 0, 0);
+        cards.Controls.Add(CreateCompatibilityCard("\uE8A5", "Browser destinations", "Standard HTML file-upload and drag-and-drop surfaces in current browsers."), 0, 1);
+        cards.Controls.Add(CreateCompatibilityCard("\uE943", ".NET and Windows destinations", "WinForms, WPF, File Explorer, and other applications that accept normal file paths."), 0, 2);
+        page.Controls.Add(cards);
+        return page;
+    }
+
+    private static Control CreateDiagnosticsPage(string cachePath, string diagnosticsPath)
+    {
+        var page = CreatePage();
+        page.Controls.Add(CreatePageHeader(
+            "Diagnostics",
+            "Inspect local bridge activity and temporary compatibility files without leaving PWADrop running in the foreground."));
+
+        var diagnosticsCard = CreateActionCard(
+            "\uE9D9",
+            "Diagnostic log",
+            "Open the redacted local event log used for troubleshooting.",
+            "Open diagnostics",
+            (_, _) => OpenPath(diagnosticsPath, createFile: true));
+        diagnosticsCard.Location = new Point(44, 150);
+        diagnosticsCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        diagnosticsCard.Width = 680;
+
+        var cacheCard = CreateActionCard(
+            "\uE8B7",
+            "Compatibility cache",
+            "Open temporary files created only for legacy virtual-file sources.",
+            "Open cache",
+            (_, _) => OpenPath(cachePath, createFile: false));
+        cacheCard.Location = new Point(44, 300);
+        cacheCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+        cacheCard.Width = 680;
+
+        page.Controls.Add(diagnosticsCard);
+        page.Controls.Add(cacheCard);
+        page.Resize += (_, _) =>
+        {
+            diagnosticsCard.Width = Math.Max(520, page.ClientSize.Width - 88);
+            cacheCard.Width = Math.Max(520, page.ClientSize.Width - 88);
+        };
+        return page;
+    }
+
+    private Control CreateAboutPage()
+    {
+        var page = CreatePage();
+        var logo = new PictureBox
+        {
+            Image = _brandBitmap,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Location = new Point(44, 54),
+            Size = new Size(88, 88),
+            AccessibleName = "PWADrop logo"
+        };
+        var title = new Label
+        {
+            Text = "PWADrop",
+            Font = FluentTheme.Display(26f, FontStyle.Bold),
+            ForeColor = FluentTheme.TextPrimary,
+            Location = new Point(154, 60),
+            AutoSize = true
+        };
+        var version = new Label
+        {
+            Text = $"Version {Application.ProductVersion}",
+            Font = FluentTheme.Text(10.5f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(158, 108),
+            AutoSize = true
+        };
+        var description = new Label
+        {
+            Text = "An open-source Windows bridge for dragging delayed files between modern apps.",
+            Font = FluentTheme.Text(11f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(48, 176),
+            Size = new Size(660, 52),
+            AutoEllipsis = true
+        };
+        var license = new Label
+        {
+            Text = "Licensed under the MIT License.",
+            Font = FluentTheme.Text(10.5f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(48, 242),
+            AutoSize = true
+        };
+        var projectButton = CreateActionButton("Open project on GitHub", (_, _) =>
+            Process.Start(new ProcessStartInfo("https://github.com/LowkeyNEXT/PwaDrop") { UseShellExecute = true }));
+        projectButton.Location = new Point(48, 292);
+
+        page.Controls.Add(logo);
+        page.Controls.Add(title);
+        page.Controls.Add(version);
+        page.Controls.Add(description);
+        page.Controls.Add(license);
+        page.Controls.Add(projectButton);
+        return page;
+    }
+
+    private static Panel CreatePage()
+    {
+        return new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = FluentTheme.Canvas,
+            Visible = false
+        };
+    }
+
+    private static Control CreatePageHeader(string title, string subtitle)
+    {
+        var header = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 126,
+            Padding = new Padding(44, 32, 44, 18),
+            BackColor = Color.Transparent
+        };
+        var titleLabel = new Label
+        {
+            Text = title,
+            Font = FluentTheme.Display(24f, FontStyle.Bold),
+            ForeColor = FluentTheme.TextPrimary,
+            Location = new Point(44, 30),
+            AutoSize = true
+        };
+        var subtitleLabel = new Label
+        {
+            Text = subtitle,
+            Font = FluentTheme.Text(10.5f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(47, 76),
+            Size = new Size(650, 44),
+            AutoEllipsis = true,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        header.Controls.Add(titleLabel);
+        header.Controls.Add(subtitleLabel);
+        return header;
+    }
+
+    private static FluentCard CreateCompatibilityCard(string glyph, string title, string description)
+    {
+        var card = new FluentCard
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 0, 12),
+            Padding = new Padding(24, 18, 24, 16)
+        };
+        var icon = new Label
+        {
+            Text = glyph,
+            Font = FluentTheme.Symbols(20f),
+            ForeColor = FluentTheme.Accent,
+            Location = new Point(24, 28),
+            AutoSize = true,
+            AccessibleName = title
+        };
+        var titleLabel = new Label
+        {
+            Text = title,
+            Font = FluentTheme.Text(11f, FontStyle.Bold),
+            ForeColor = FluentTheme.TextPrimary,
+            Location = new Point(76, 20),
+            AutoSize = true
+        };
+        var descriptionLabel = new Label
+        {
+            Text = description,
+            Font = FluentTheme.Text(9.8f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(78, 52),
+            Size = new Size(560, 44),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        card.Controls.Add(icon);
+        card.Controls.Add(titleLabel);
+        card.Controls.Add(descriptionLabel);
+        return card;
+    }
+
+    private static FluentCard CreateActionCard(
+        string glyph,
+        string title,
+        string description,
+        string action,
+        EventHandler click)
+    {
+        var card = new FluentCard
+        {
+            Height = 126,
+            Padding = new Padding(24)
+        };
+        var icon = new Label
+        {
+            Text = glyph,
+            Font = FluentTheme.Symbols(20f),
+            ForeColor = FluentTheme.Accent,
+            Location = new Point(24, 42),
+            AutoSize = true,
+            AccessibleName = title
+        };
+        var titleLabel = new Label
+        {
+            Text = title,
+            Font = FluentTheme.Text(11f, FontStyle.Bold),
+            ForeColor = FluentTheme.TextPrimary,
+            Location = new Point(76, 28),
+            AutoSize = true
+        };
+        var descriptionLabel = new Label
+        {
+            Text = description,
+            Font = FluentTheme.Text(9.8f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(78, 60),
+            Size = new Size(380, 42),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var button = CreateActionButton(action, click);
+        button.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        button.Location = new Point(card.Width - button.Width - 24, 43);
+        card.Resize += (_, _) => button.Left = card.ClientSize.Width - button.Width - 24;
+        card.Controls.Add(icon);
+        card.Controls.Add(titleLabel);
+        card.Controls.Add(descriptionLabel);
+        card.Controls.Add(button);
+        return card;
+    }
+
+    private static Panel CreateSettingRow(
+        string title,
+        string description,
+        string? glyph,
+        out FluentToggle toggle,
+        bool drawBottomBorder = true)
+    {
+        var row = new SettingRow(drawBottomBorder)
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            Cursor = Cursors.Hand,
+            AccessibleName = title
+        };
+        var textLeft = string.IsNullOrEmpty(glyph) ? 4 : 72;
+        if (!string.IsNullOrEmpty(glyph))
+        {
+            var icon = new Label
+            {
+                Text = glyph,
+                Font = FluentTheme.Symbols(21f),
+                ForeColor = FluentTheme.AccentSecondary,
+                Location = new Point(4, 31),
+                AutoSize = true,
+                AccessibleName = title
+            };
+            row.Controls.Add(icon);
+        }
+
+        var titleLabel = new Label
+        {
+            Text = title,
+            Font = FluentTheme.Text(11f, FontStyle.Bold),
+            ForeColor = FluentTheme.TextPrimary,
+            Location = new Point(textLeft, 25),
+            AutoSize = true
+        };
+        var descriptionLabel = new Label
+        {
+            Text = description,
+            Font = FluentTheme.Text(9.8f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(textLeft + 2, 55),
+            Size = new Size(520, 32),
+            AutoEllipsis = true,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+        var rowToggle = new FluentToggle
+        {
+            Location = new Point(row.Width - 66, 34),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            AccessibleName = title,
+            AccessibleDescription = description
+        };
+        row.Resize += (_, _) =>
+        {
+            rowToggle.Left = row.ClientSize.Width - rowToggle.Width - 4;
+            descriptionLabel.Width = Math.Max(240, rowToggle.Left - descriptionLabel.Left - 24);
+        };
+        row.Click += (_, _) => rowToggle.Checked = !rowToggle.Checked;
+        titleLabel.Click += (_, _) => rowToggle.Checked = !rowToggle.Checked;
+        descriptionLabel.Click += (_, _) => rowToggle.Checked = !rowToggle.Checked;
+
+        row.Controls.Add(titleLabel);
+        row.Controls.Add(descriptionLabel);
+        row.Controls.Add(rowToggle);
+        toggle = rowToggle;
+        return row;
+    }
+
+    private static NavigationButton CreateNavigationButton(string text, string glyph, int top)
+    {
+        return new NavigationButton(text, glyph)
+        {
+            Location = new Point(14, top),
+            Width = NavigationWidth - 28,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+    }
+
+    private static Button CreateWindowButton(string glyph, string accessibleName, EventHandler click, bool isClose = false)
+    {
+        var button = new Button
+        {
+            Text = glyph,
+            AccessibleName = accessibleName,
+            AccessibleRole = AccessibleRole.PushButton,
+            Font = FluentTheme.Symbols(10f),
+            Size = new Size(46, TitleBarHeight),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = FluentTheme.Navigation,
+            ForeColor = FluentTheme.TextPrimary,
+            TabStop = true,
+            Cursor = Cursors.Default
+        };
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseOverBackColor = isClose ? Color.FromArgb(196, 43, 54) : FluentTheme.SurfaceHover;
+        button.FlatAppearance.MouseDownBackColor = isClose ? Color.FromArgb(151, 32, 42) : FluentTheme.SurfacePressed;
+        button.Click += click;
+        return button;
+    }
+
+    private static Button CreateActionButton(string text, EventHandler click)
+    {
+        var button = new Button
+        {
+            Text = text,
+            AutoSize = false,
+            Size = new Size(152, 38),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = FluentTheme.Accent,
+            ForeColor = Color.White,
+            Font = FluentTheme.Text(9.5f, FontStyle.Bold),
+            Cursor = Cursors.Hand,
+            AccessibleName = text
+        };
+        button.FlatAppearance.BorderSize = 0;
+        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(92, 121, 255);
+        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(58, 87, 222);
+        button.Click += click;
+        return button;
+    }
+
+    private static void LayoutHero(Panel hero, Control brand, Control glyph, Control title, Control subtitle)
+    {
+        brand.Left = (hero.ClientSize.Width - brand.Width) / 2;
+        brand.Top = Math.Max(10, (hero.ClientSize.Height - 238) / 2);
+        var statusWidth = glyph.Width + 12 + title.Width;
+        glyph.Left = (hero.ClientSize.Width - statusWidth) / 2;
+        glyph.Top = brand.Bottom + 18;
+        title.Left = glyph.Right + 12;
+        title.Top = glyph.Top - 6;
+        subtitle.Left = (hero.ClientSize.Width - subtitle.Width) / 2;
+        subtitle.Top = title.Bottom + 8;
+    }
+
+    private void SelectPage(NavigationButton selected)
+    {
+        foreach (var pair in _pages)
+        {
+            pair.Key.Selected = ReferenceEquals(pair.Key, selected);
+            pair.Value.Visible = ReferenceEquals(pair.Key, selected);
+        }
+
+        _pages[selected].BringToFront();
     }
 
     private void ToggleChanged(object? sender, EventArgs eventArgs)
@@ -136,79 +769,67 @@ internal sealed class SettingsForm : Form
             return;
         }
 
-        SettingsChanged?.Invoke(new AppSettings(_enabledToggle.Checked, _startupToggle.Checked));
+        SettingsChanged?.Invoke(new AppSettings(
+            _enabledToggle.Checked,
+            _startupToggle.Checked,
+            _notificationsToggle.Checked));
     }
 
-    private static CheckBox CreateToggle(string title, string description) => new()
+    private void ToggleMaximize()
     {
-        Text = title + Environment.NewLine + description,
-        CheckAlign = ContentAlignment.MiddleRight,
-        TextAlign = ContentAlignment.MiddleLeft,
-        Dock = DockStyle.Fill,
-        FlatStyle = FlatStyle.Flat,
-        Appearance = Appearance.Button,
-        Padding = new Padding(20, 10, 18, 10),
-        AutoSize = false,
-        BackColor = Color.White,
-        ForeColor = Color.FromArgb(24, 29, 43),
-        Font = new Font("Segoe UI Variable Text", 10.5f),
-        Cursor = Cursors.Hand
-    };
-
-    private static Panel WrapCard(Control content)
-    {
-        var panel = new Panel { Dock = DockStyle.Fill, BackColor = Color.White, Margin = new Padding(0, 0, 0, 12) };
-        panel.Controls.Add(content);
-        return panel;
+        WindowState = WindowState == FormWindowState.Maximized
+            ? FormWindowState.Normal
+            : FormWindowState.Maximized;
     }
 
-    private static Button CreateButton(string text, EventHandler click)
+    private int HitTest(Point point)
     {
-        var button = new Button
+        const int resizeBorder = 8;
+        var left = point.X < resizeBorder;
+        var right = point.X >= ClientSize.Width - resizeBorder;
+        var top = point.Y < resizeBorder;
+        var bottom = point.Y >= ClientSize.Height - resizeBorder;
+
+        if (top && left) return NativeMethods.HtTopLeft;
+        if (top && right) return NativeMethods.HtTopRight;
+        if (bottom && left) return NativeMethods.HtBottomLeft;
+        if (bottom && right) return NativeMethods.HtBottomRight;
+        if (left) return NativeMethods.HtLeft;
+        if (right) return NativeMethods.HtRight;
+        if (top) return NativeMethods.HtTop;
+        if (bottom) return NativeMethods.HtBottom;
+        if (point.Y < TitleBarHeight && point.X < ClientSize.Width - 138) return NativeMethods.HtCaption;
+        return NativeMethods.HtClient;
+    }
+
+    private static void OpenPath(string path, bool createFile)
+    {
+        var directory = createFile ? Path.GetDirectoryName(path) : path;
+        if (!string.IsNullOrEmpty(directory))
         {
-            Text = text,
-            AutoSize = false,
-            Size = new Size(120, 38),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(72, 82, 255),
-            ForeColor = Color.White,
-            Cursor = Cursors.Hand
-        };
-        button.FlatAppearance.BorderSize = 0;
-        button.Click += click;
-        return button;
-    }
-
-    private static void OpenCache(string path)
-    {
-        Directory.CreateDirectory(path);
-        Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
-    }
-
-    private sealed class BrandHeader : Control
-    {
-        internal BrandHeader()
-        {
-            DoubleBuffered = true;
+            Directory.CreateDirectory(directory);
         }
 
-        protected override void OnPaint(PaintEventArgs e)
+        if (createFile && !File.Exists(path))
         {
-            base.OnPaint(e);
-            using var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
-                ClientRectangle,
-                Color.FromArgb(62, 96, 244),
-                Color.FromArgb(131, 75, 236),
-                15f);
-            e.Graphics.FillRectangle(brush, ClientRectangle);
-            using var logo = BrandIcon.CreateBitmap(76);
-            e.Graphics.DrawImage(logo, new Rectangle(32, 28, 76, 76));
-            using var titleFont = new Font("Segoe UI Variable Display", 24f, FontStyle.Bold);
-            using var subtitleFont = new Font("Segoe UI Variable Text", 10.5f);
-            using var textBrush = new SolidBrush(Color.White);
-            using var mutedBrush = new SolidBrush(Color.FromArgb(220, 235, 245, 255));
-            e.Graphics.DrawString("PwaDrop", titleFont, textBrush, 126, 32);
-            e.Graphics.DrawString("Drag from New Outlook. Drop anywhere.", subtitleFont, mutedBrush, 130, 78);
+            File.WriteAllText(path, string.Empty);
+        }
+
+        Process.Start(new ProcessStartInfo(createFile ? "notepad.exe" : "explorer.exe", path) { UseShellExecute = true });
+    }
+
+    private sealed class SettingRow(bool drawBottomBorder) : Panel
+    {
+        protected override void OnPaint(PaintEventArgs eventArgs)
+        {
+            base.OnPaint(eventArgs);
+            if (!drawBottomBorder)
+            {
+                return;
+            }
+
+            using var pen = new Pen(FluentTheme.Stroke, 1f);
+            eventArgs.Graphics.DrawLine(pen, 0, Height - 1, Width, Height - 1);
         }
     }
 }
