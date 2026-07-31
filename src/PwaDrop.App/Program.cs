@@ -43,7 +43,13 @@ internal static class Program
 
     private static bool TryRenderSettings(string[] args)
     {
-        if (args.Length != 2 || !args[0].Equals("--render-settings", StringComparison.OrdinalIgnoreCase))
+        if (args.Length != 2)
+        {
+            return false;
+        }
+
+        var renderMode = args[0].ToLowerInvariant();
+        if (renderMode is not ("--render-settings" or "--render-settings-min" or "--render-about"))
         {
             return false;
         }
@@ -53,7 +59,11 @@ internal static class Program
             new AppSettings(),
             Path.Combine(previewRoot, "Cache"),
             Path.Combine(previewRoot, "diagnostics.log"));
-        form.RenderTo(args[1]);
+        var pageName = renderMode == "--render-about" ? "About" : "Overview";
+        var renderSize = renderMode == "--render-settings-min"
+            ? new Size(900, 700)
+            : new Size(1034, 782);
+        form.RenderTo(args[1], pageName, renderSize);
         return true;
     }
 }
