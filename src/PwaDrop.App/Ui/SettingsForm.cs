@@ -28,7 +28,9 @@ internal sealed class SettingsForm : Form
         Icon = BrandIcon.CreateIcon();
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.None;
-        MinimumSize = new Size(900, 640);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        AutoScaleDimensions = new SizeF(96f, 96f);
+        MinimumSize = new Size(900, 700);
         Size = new Size(1034, 782);
         BackColor = FluentTheme.Canvas;
         ForeColor = FluentTheme.TextPrimary;
@@ -37,23 +39,47 @@ internal sealed class SettingsForm : Form
         _brandBitmap = BrandIcon.CreateBitmap(96);
         _bridgeBitmap = BrandIcon.CreateBridgeHeroBitmap();
 
-        var body = new Panel
+        var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            BackColor = FluentTheme.Canvas
+            BackColor = FluentTheme.Canvas,
+            ColumnCount = 1,
+            RowCount = 2,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            GrowStyle = TableLayoutPanelGrowStyle.FixedSize
         };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, TitleBarHeight));
+        root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var body = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = FluentTheme.Canvas,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            GrowStyle = TableLayoutPanelGrowStyle.FixedSize
+        };
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, NavigationWidth));
+        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         var titleBar = CreateTitleBar();
         var navigation = CreateNavigation();
         var contentHost = new Panel
         {
             Dock = DockStyle.Fill,
-            BackColor = FluentTheme.Canvas
+            BackColor = FluentTheme.Canvas,
+            Margin = Padding.Empty
         };
 
-        Controls.Add(body);
-        Controls.Add(titleBar);
-        body.Controls.Add(contentHost);
-        body.Controls.Add(navigation);
+        Controls.Add(root);
+        root.Controls.Add(titleBar, 0, 0);
+        root.Controls.Add(body, 0, 1);
+        body.Controls.Add(navigation, 0, 0);
+        body.Controls.Add(contentHost, 1, 0);
 
         var overview = CreateOverviewPage(out _enabledToggle, out _startupToggle, out _notificationsToggle, out _statusTitle, out _statusSubtitle, out _statusGlyph);
         var compatibility = CreateCompatibilityPage();
@@ -126,7 +152,7 @@ internal sealed class SettingsForm : Form
         _statusGlyph.ForeColor = active ? FluentTheme.Success : paused ? FluentTheme.Warning : FluentTheme.Accent;
     }
 
-    internal void RenderTo(string path)
+    internal void RenderTo(string path, string pageName = "Overview", Size? renderSize = null)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));
         if (!string.IsNullOrEmpty(directory))
@@ -134,7 +160,8 @@ internal sealed class SettingsForm : Form
             Directory.CreateDirectory(directory);
         }
 
-        Size = new Size(1034, 782);
+        Size = renderSize ?? new Size(1034, 782);
+        SelectPage(pageName);
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
         Location = new Point(-32000, -32000);
@@ -212,9 +239,10 @@ internal sealed class SettingsForm : Form
     {
         var titleBar = new Panel
         {
-            Dock = DockStyle.Top,
+            Dock = DockStyle.Fill,
             Height = TitleBarHeight,
-            BackColor = FluentTheme.Navigation
+            BackColor = FluentTheme.Navigation,
+            Margin = Padding.Empty
         };
 
         var logo = new PictureBox
@@ -254,10 +282,10 @@ internal sealed class SettingsForm : Form
     {
         var navigation = new Panel
         {
-            Dock = DockStyle.Left,
-            Width = NavigationWidth,
+            Dock = DockStyle.Fill,
             BackColor = FluentTheme.Navigation,
-            Padding = new Padding(14, 28, 14, 22)
+            Padding = new Padding(14, 28, 14, 22),
+            Margin = Padding.Empty
         };
 
         var overview = CreateNavigationButton("Overview", "\uE80F", 35);
@@ -442,30 +470,56 @@ internal sealed class SettingsForm : Form
     private Control CreateAboutPage()
     {
         var page = CreatePage();
+        var identity = new TableLayoutPanel
+        {
+            Location = new Point(44, 54),
+            Size = new Size(680, 96),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            ColumnCount = 2,
+            RowCount = 2,
+            BackColor = Color.Transparent,
+            Margin = Padding.Empty,
+            Padding = Padding.Empty,
+            GrowStyle = TableLayoutPanelGrowStyle.FixedSize
+        };
+        identity.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
+        identity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        identity.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
+        identity.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
         var logo = new PictureBox
         {
             Image = _brandBitmap,
             SizeMode = PictureBoxSizeMode.Zoom,
-            Location = new Point(44, 54),
             Size = new Size(88, 88),
-            AccessibleName = "PWADrop logo"
+            AccessibleName = "PWADrop logo",
+            Anchor = AnchorStyles.Top | AnchorStyles.Left,
+            Margin = Padding.Empty
         };
         var title = new Label
         {
             Text = "PWADrop",
             Font = FluentTheme.Display(26f, FontStyle.Bold),
             ForeColor = FluentTheme.TextPrimary,
-            Location = new Point(154, 60),
-            AutoSize = true
+            Dock = DockStyle.Fill,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(14, 0, 0, 0)
         };
         var version = new Label
         {
             Text = $"Version {Application.ProductVersion}",
             Font = FluentTheme.Text(10.5f),
             ForeColor = FluentTheme.TextSecondary,
-            Location = new Point(158, 108),
-            AutoSize = true
+            Dock = DockStyle.Fill,
+            AutoSize = false,
+            AutoEllipsis = true,
+            TextAlign = ContentAlignment.TopLeft,
+            Margin = new Padding(18, 0, 0, 0)
         };
+        identity.Controls.Add(logo, 0, 0);
+        identity.SetRowSpan(logo, 2);
+        identity.Controls.Add(title, 1, 0);
+        identity.Controls.Add(version, 1, 1);
         var description = new Label
         {
             Text = "An open-source Windows bridge for dragging delayed files between modern apps.",
@@ -473,7 +527,8 @@ internal sealed class SettingsForm : Form
             ForeColor = FluentTheme.TextSecondary,
             Location = new Point(48, 176),
             Size = new Size(660, 52),
-            AutoEllipsis = true
+            AutoEllipsis = true,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
         var license = new Label
         {
@@ -487,9 +542,7 @@ internal sealed class SettingsForm : Form
             Process.Start(new ProcessStartInfo("https://github.com/LowkeyNEXT/PwaDrop") { UseShellExecute = true }));
         projectButton.Location = new Point(48, 292);
 
-        page.Controls.Add(logo);
-        page.Controls.Add(title);
-        page.Controls.Add(version);
+        page.Controls.Add(identity);
         page.Controls.Add(description);
         page.Controls.Add(license);
         page.Controls.Add(projectButton);
@@ -620,6 +673,7 @@ internal sealed class SettingsForm : Form
         button.Anchor = AnchorStyles.Top | AnchorStyles.Right;
         button.Location = new Point(card.Width - button.Width - 24, 43);
         card.Resize += (_, _) => button.Left = card.ClientSize.Width - button.Width - 24;
+        card.Resize += (_, _) => descriptionLabel.Width = Math.Max(200, button.Left - descriptionLabel.Left - 18);
         card.Controls.Add(icon);
         card.Controls.Add(titleLabel);
         card.Controls.Add(descriptionLabel);
@@ -774,6 +828,18 @@ internal sealed class SettingsForm : Form
         }
 
         _pages[selected].BringToFront();
+    }
+
+    private void SelectPage(string pageName)
+    {
+        var button = _pages.Keys.FirstOrDefault(candidate =>
+            candidate.Text.Equals(pageName, StringComparison.OrdinalIgnoreCase));
+        if (button is null)
+        {
+            throw new ArgumentOutOfRangeException(nameof(pageName), pageName, "Unknown settings page.");
+        }
+
+        SelectPage(button);
     }
 
     private void ToggleChanged(object? sender, EventArgs eventArgs)
