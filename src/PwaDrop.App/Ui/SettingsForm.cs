@@ -122,7 +122,7 @@ internal sealed class SettingsForm : Form
             : paused
                 ? "Enable the bridge when you are ready."
                 : "PWADrop is handling the current drag.";
-        _statusGlyph.Text = active ? "\uF13E" : paused ? "\uE769" : "\uE895";
+        _statusGlyph.Text = active ? "\uE930" : paused ? "\uE769" : "\uE895";
         _statusGlyph.ForeColor = active ? FluentTheme.Success : paused ? FluentTheme.Warning : FluentTheme.Accent;
     }
 
@@ -261,8 +261,8 @@ internal sealed class SettingsForm : Form
         };
 
         var overview = CreateNavigationButton("Overview", "\uE80F", 35);
-        var compatibility = CreateNavigationButton("Compatibility", "\uE950", 99);
-        var diagnostics = CreateNavigationButton("Diagnostics", "\uE9D9", 163);
+        var compatibility = CreateNavigationButton("Compatibility", "\uEA86", 99);
+        var diagnostics = CreateNavigationButton("Diagnostics", "\uE95E", 163);
         var separator = new Panel
         {
             Location = new Point(24, 231),
@@ -318,7 +318,7 @@ internal sealed class SettingsForm : Form
         };
         var heroStatusGlyph = new Label
         {
-            Text = "\uF13E",
+            Text = "\uE930",
             Font = FluentTheme.Symbols(30f),
             ForeColor = FluentTheme.Success,
             AutoSize = true,
