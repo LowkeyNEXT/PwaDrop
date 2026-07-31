@@ -362,7 +362,7 @@ internal sealed class SettingsForm : Form
             out startupToggle);
         var notificationsRow = CreateSettingRow(
             "Show status notifications",
-            "Get notified when the bridge completes a drop or has an issue.",
+            "Get notified when the bridge is active or has issues.",
             "\uEA8F",
             out notificationsToggle,
             drawBottomBorder: false);
