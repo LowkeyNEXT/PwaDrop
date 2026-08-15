@@ -8,6 +8,8 @@
 
 PWADrop is a source-available Windows utility that turns asynchronous Chromium and WebView2 file drags into normal Windows file drops. It fills the gap where a file can be dragged from a modern app to File Explorer, but not directly into a browser upload target, a ticket, or another Windows application.
 
+[Website](https://lowkeynext.github.io/PwaDrop/) · [Privacy policy](https://lowkeynext.github.io/PwaDrop/privacy/) · [FAQ](https://lowkeynext.github.io/PwaDrop/faq/)
+
 ![PWADrop settings window](docs/images/PWADrop-settings.png)
 
 > [!IMPORTANT]
