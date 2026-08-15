@@ -523,7 +523,7 @@ internal sealed class SettingsForm : Form
         identity.Controls.Add(version, 1, 1);
         var description = new Label
         {
-            Text = "An open-source Windows bridge for dragging delayed files between modern apps.",
+            Text = "A source-available Windows bridge for dragging delayed files between modern apps.",
             Font = FluentTheme.Text(11f),
             ForeColor = FluentTheme.TextSecondary,
             Location = new Point(48, 176),
@@ -533,7 +533,7 @@ internal sealed class SettingsForm : Form
         };
         var license = new Label
         {
-            Text = "Licensed under the MIT License.",
+            Text = "Licensed for non-commercial use under PolyForm Noncommercial 1.0.0.",
             Font = FluentTheme.Text(10.5f),
             ForeColor = FluentTheme.TextSecondary,
             Location = new Point(48, 242),

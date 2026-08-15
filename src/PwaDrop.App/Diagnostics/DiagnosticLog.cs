@@ -31,13 +31,28 @@ internal sealed class DiagnosticLog
     internal void PrimeStarted(bool ownsOperation) =>
         Write($"prime_started owns_operation={ownsOperation}");
 
-    internal void PrimeCompleted(string reason, int endResult, TimeSpan elapsed) =>
-        Write($"prime_completed reason={reason} hresult=0x{endResult:X8} elapsed_ms={elapsed.TotalMilliseconds:F0}");
+    internal void PrimeCompleted(string reason, int endResult, int fileCount, TimeSpan elapsed) =>
+        Write($"prime_completed reason={reason} hresult=0x{endResult:X8} files={fileCount} elapsed_ms={elapsed.TotalMilliseconds:F0}");
 
-    internal void PrimeFailed(int errorCode) =>
-        Write($"prime_failed hresult=0x{errorCode:X8}");
+    internal void PrimeFailed(int errorCode, TimeSpan elapsed) =>
+        Write($"prime_failed hresult=0x{errorCode:X8} elapsed_ms={elapsed.TotalMilliseconds:F0}");
+
+    internal void HookInjectionCompleted(TimeSpan elapsed) =>
+        Write($"hook_injection_completed elapsed_ms={elapsed.TotalMilliseconds:F0}");
+
+    internal void HookInjectionFailed(int errorCode, TimeSpan elapsed) =>
+        Write($"hook_injection_failed hresult=0x{errorCode:X8} elapsed_ms={elapsed.TotalMilliseconds:F0}");
+
+    internal void HookInjectionFailed(int errorCode, int nativeExitCode, TimeSpan elapsed) =>
+        Write($"hook_injection_failed hresult=0x{errorCode:X8} native_exit={nativeExitCode} elapsed_ms={elapsed.TotalMilliseconds:F0}");
+
+    internal void ProcessWatcherUnavailable(Exception exception) =>
+        Write($"process_watcher_unavailable hresult=0x{exception.HResult:X8} type={exception.GetType().Name} message={SingleLine(exception.Message)} fallback_seconds=5");
 
     internal void UnsupportedPayload() => Write("unsupported_payload");
+
+    private static string SingleLine(string value) =>
+        value.Replace('\r', ' ').Replace('\n', ' ');
 
     private void Write(string eventData)
     {

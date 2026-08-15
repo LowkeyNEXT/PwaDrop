@@ -42,9 +42,24 @@ internal static class NativeMethods
     internal const short CfHDrop = 15;
     internal const uint DragQueryFileCount = 0xFFFFFFFF;
     internal const uint Th32CsSnapProcess = 0x00000002;
+    internal const uint InputMouse = 0;
+    internal const uint MouseEventMove = 0x0001;
+    internal const uint EventObjectCreate = 0x8000;
+    internal const uint WinEventOutOfContext = 0x0000;
+    internal const uint WinEventSkipOwnProcess = 0x0002;
+    internal const int ObjIdWindow = 0;
+    internal const int ChildIdSelf = 0;
 
     internal delegate IntPtr HookProc(int code, IntPtr wParam, IntPtr lParam);
     internal delegate bool EnumWindowsProc(IntPtr hwnd, IntPtr lParam);
+    internal delegate void WinEventProc(
+        IntPtr hook,
+        uint eventType,
+        IntPtr hwnd,
+        int objectId,
+        int childId,
+        uint eventThread,
+        uint eventTime);
 
     [StructLayout(LayoutKind.Sequential)]
     internal readonly struct Point(int x, int y)
@@ -82,6 +97,24 @@ internal static class NativeMethods
         internal UIntPtr ExtraInfo;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Input
+    {
+        internal uint Type;
+        internal MouseInput Mouse;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct MouseInput
+    {
+        internal int X;
+        internal int Y;
+        internal uint MouseData;
+        internal uint Flags;
+        internal uint Time;
+        internal UIntPtr ExtraInfo;
+    }
+
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     internal struct ProcessEntry32
     {
@@ -108,6 +141,20 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     internal static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern IntPtr SetWinEventHook(
+        uint eventMin,
+        uint eventMax,
+        IntPtr eventHookModule,
+        WinEventProc callback,
+        uint processId,
+        uint threadId,
+        uint flags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool UnhookWinEvent(IntPtr hook);
 
     [DllImport("user32.dll")]
     internal static extern short GetAsyncKeyState(int virtualKey);
@@ -143,6 +190,13 @@ internal static class NativeMethods
         int width,
         int height,
         uint flags);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetCursorPos(int x, int y);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern uint SendInput(uint inputCount, [In] Input[] inputs, int size);
 
     [DllImport("ole32.dll")]
     internal static extern int RegisterDragDrop(IntPtr hwnd, [MarshalAs(UnmanagedType.Interface)] IOleDropTarget dropTarget);

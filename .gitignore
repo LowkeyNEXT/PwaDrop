@@ -6,6 +6,8 @@ obj/
 TestResults/
 artifacts/
 publish/
+native/build*/
+native/build-msvc-current.txt
 /outputs/
 /work/
 *.user

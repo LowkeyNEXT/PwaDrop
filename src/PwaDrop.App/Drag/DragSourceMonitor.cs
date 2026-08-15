@@ -19,11 +19,11 @@ internal sealed class DragSourceMonitor : IDisposable
     internal DragSourceMonitor(
         RelayOverlayForm overlay,
         Func<IReadOnlyList<IntPtr>> excludedWindows,
-        Action primedDragReleased)
+        Action? primedDragReleased = null)
     {
         _overlay = overlay;
         _excludedWindows = excludedWindows;
-        _primedDragReleased = primedDragReleased;
+        _primedDragReleased = primedDragReleased ?? (() => { });
         _callback = HookCallback;
     }
 
@@ -93,6 +93,7 @@ internal sealed class DragSourceMonitor : IDisposable
                 break;
             case NativeMethods.WmLButtonUp:
                 var primedDragReleased = _currentDragPrimed;
+                _overlay.ScheduleHideAfterRelease();
                 _sourceRoot = IntPtr.Zero;
                 _sourceProcessId = 0;
                 _thresholdPassed = false;

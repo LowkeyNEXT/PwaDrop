@@ -583,6 +583,28 @@ internal sealed class PrimedDragOperation : IDisposable
         return TryComplete(result, effect, out var endResult) ? endResult : 0;
     }
 
+    internal async Task<IReadOnlyList<string>> MaterializeAndCompleteAfterReleaseAsync(
+        TimeSpan unwindDelay,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(unwindDelay, cancellationToken).ConfigureAwait(false);
+            var dataObject = Volatile.Read(ref _dataObject)
+                ?? throw new InvalidOperationException("The primed drag operation was already completed.");
+            var paths = VirtualFileExtractor.ReadFileDropPaths(dataObject);
+            _ = Complete(0, NativeMethods.DropEffectCopy);
+            return paths;
+        }
+        catch (Exception exception)
+        {
+            _ = Complete(
+                Marshal.GetHRForException(exception),
+                NativeMethods.DropEffectNone);
+            throw;
+        }
+    }
+
     internal bool TryComplete(int result, uint effect, out int endResult)
     {
         if (Interlocked.Exchange(ref _completed, 1) != 0)

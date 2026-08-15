@@ -5,10 +5,16 @@ namespace PwaDrop.DragHarness;
 
 internal sealed class HarnessForm : Form
 {
-    private readonly ListBox _receivedFiles;
+    private ListBox _receivedFiles = null!;
 
-    internal HarnessForm()
+    internal HarnessForm(bool automationMode = false)
     {
+        if (automationMode)
+        {
+            InitializeAutomationSurface();
+            return;
+        }
+
         Text = "PWADrop drag harness";
         Size = new Size(900, 520);
         StartPosition = FormStartPosition.CenterScreen;
@@ -17,14 +23,14 @@ internal sealed class HarnessForm : Form
 
         var title = new Label
         {
-            Text = "Original-drag priming test",
+            Text = "Asynchronous drop replay test",
             Font = new Font(Font.FontFamily, 20f, FontStyle.Bold),
             AutoSize = true,
             Location = new Point(34, 28)
         };
         var instructions = new Label
         {
-            Text = "Run PWADrop, then drag the source card to the .NET WinForms target. PWADrop primes delayed CF_HDROP and gets out of the way; the target receives that same original drag as physical files.",
+            Text = "Run PWADrop, then drag the source card to a browser or the .NET target. PWADrop accepts the delayed drop asynchronously, prepares physical files, and replays them at the same destination.",
             AutoEllipsis = true,
             Location = new Point(38, 74),
             Size = new Size(810, 48),
@@ -64,6 +70,45 @@ internal sealed class HarnessForm : Form
         Controls.Add(source);
         Controls.Add(target);
         Controls.Add(_receivedFiles);
+    }
+
+    private void InitializeAutomationSurface()
+    {
+        Text = "PWADrop drag automation harness";
+        FormBorderStyle = FormBorderStyle.None;
+        ShowInTaskbar = true;
+        TopMost = true;
+        StartPosition = FormStartPosition.Manual;
+        var automationScreen = Screen.PrimaryScreen
+            ?? throw new InvalidOperationException("The automation harness requires a primary display.");
+        Bounds = automationScreen.Bounds;
+        BackColor = Color.Fuchsia;
+        Font = new Font("Segoe UI", 10f);
+
+        var source = CreateCard(
+            "DRAG FROM HERE",
+            "Delayed Chromium-style CF_HDROP",
+            Color.FromArgb(77, 91, 255));
+        source.Location = new Point(40, 180);
+        source.MouseDown += BeginAutomationVirtualDrag;
+        foreach (Control child in source.Controls)
+        {
+            child.MouseDown += BeginAutomationVirtualDrag;
+        }
+
+        Controls.Add(source);
+        _receivedFiles = new ListBox();
+    }
+
+    private void BeginAutomationVirtualDrag(object? sender, MouseEventArgs eventArgs)
+    {
+        if (eventArgs.Button != MouseButtons.Left)
+        {
+            return;
+        }
+
+        TransparencyKey = BackColor;
+        BeginVirtualDrag(sender, eventArgs);
     }
 
     private static Panel CreateCard(string title, string subtitle, Color accent)

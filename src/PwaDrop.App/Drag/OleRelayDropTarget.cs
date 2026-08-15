@@ -9,7 +9,7 @@ namespace PwaDrop.App.Drag;
 internal sealed class OleRelayDropTarget : IOleDropTarget
 {
     private readonly VirtualFileExtractor _extractor;
-    private readonly Func<ComTypes.IDataObject, bool> _prime;
+    private readonly Func<ComTypes.IDataObject, uint, bool> _prime;
     private readonly Func<ComTypes.IDataObject, NativeMethods.PointL, DragPayloadKind, bool> _drop;
     private readonly Action _leave;
     private readonly Action _unsupported;
@@ -17,7 +17,7 @@ internal sealed class OleRelayDropTarget : IOleDropTarget
 
     internal OleRelayDropTarget(
         VirtualFileExtractor extractor,
-        Func<ComTypes.IDataObject, bool> prime,
+        Func<ComTypes.IDataObject, uint, bool> prime,
         Func<ComTypes.IDataObject, NativeMethods.PointL, DragPayloadKind, bool> drop,
         Action leave,
         Action unsupported)
@@ -35,7 +35,7 @@ internal sealed class OleRelayDropTarget : IOleDropTarget
         if (_payloadKind == DragPayloadKind.AsyncFileDrop)
         {
             effect = NativeMethods.DropEffectNone;
-            _ = _prime(dataObject);
+            _ = _prime(dataObject, keyState);
             _payloadKind = DragPayloadKind.Unsupported;
             return 0;
         }

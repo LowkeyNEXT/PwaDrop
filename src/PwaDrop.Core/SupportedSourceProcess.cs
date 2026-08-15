@@ -7,10 +7,16 @@ public static class SupportedSourceProcess
         "brave",
         "chrome",
         "chromium",
+        "comet",
+        "missive",
         "msedge",
         "msedgewebview2",
+        "ms-teams",
+        "msteams",
         "olk",
         "opera",
+        "slack",
+        "superhuman",
         "vivaldi",
         "Microsoft.OutlookForWindows",
         "PwaDrop.DragHarness"
@@ -23,6 +29,12 @@ public static class SupportedSourceProcess
             return false;
         }
 
-        return Names.Contains(Path.GetFileNameWithoutExtension(executableName));
+        var name = Path.GetFileName(executableName);
+        if (name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+        {
+            name = name.Substring(0, name.Length - 4);
+        }
+
+        return Names.Contains(name);
     }
 }

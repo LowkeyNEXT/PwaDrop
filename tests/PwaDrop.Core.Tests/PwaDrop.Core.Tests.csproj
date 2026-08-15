@@ -13,7 +13,7 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/PwaDrop.AsyncDrag/PwaDrop.AsyncDrag.csproj" />
     <ProjectReference Include="../../src/PwaDrop.Core/PwaDrop.Core.csproj" />
   </ItemGroup>
 </Project>
-

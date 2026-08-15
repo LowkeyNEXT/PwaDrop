@@ -58,21 +58,52 @@ internal static class ProcessClassifier
                 break;
             }
 
-            var name = Path.GetFileNameWithoutExtension(process.Executable);
-            if (SupportedSourceProcess.IsSupported(name))
+            var name = Path.GetFileNameWithoutExtension(process.ExecutableName);
+            if (name.Equals("olk", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals(
+                    "Microsoft.OutlookForWindows",
+                    StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("ms-teams", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals(
+                    "msteams",
+                    StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
 
-            current = process.ParentId;
+            current = process.ParentProcessId;
         }
 
         return false;
     }
 
-    private static Dictionary<uint, ProcessInfo> SnapshotProcessTree()
+    internal static bool IsRootSupportedSourceProcess(
+        uint processId,
+        IReadOnlyDictionary<uint, SourceProcessInfo> processes) =>
+        SourceProcessPolicy.ClassifyRoot(processId, processes) != SourceProcessFamily.None;
+
+    internal static IReadOnlySet<uint> SnapshotTopLevelWindowProcessIds()
     {
-        var result = new Dictionary<uint, ProcessInfo>();
+        var processIds = new HashSet<uint>();
+        _ = NativeMethods.EnumWindows((window, _) =>
+        {
+            if (NativeMethods.IsWindowVisible(window))
+            {
+                NativeMethods.GetWindowThreadProcessId(window, out var processId);
+                if (processId != 0)
+                {
+                    processIds.Add(processId);
+                }
+            }
+
+            return true;
+        }, IntPtr.Zero);
+        return processIds;
+    }
+
+    internal static IReadOnlyDictionary<uint, SourceProcessInfo> SnapshotProcessTree()
+    {
+        var result = new Dictionary<uint, SourceProcessInfo>();
         var snapshot = NativeMethods.CreateToolhelp32Snapshot(NativeMethods.Th32CsSnapProcess, 0);
         if (snapshot == new IntPtr(-1))
         {
@@ -93,7 +124,10 @@ internal static class ProcessClassifier
 
             do
             {
-                result[entry.ProcessId] = new ProcessInfo(entry.ParentProcessId, entry.ExeFile ?? string.Empty);
+                result[entry.ProcessId] = new SourceProcessInfo(
+                    entry.ProcessId,
+                    entry.ParentProcessId,
+                    entry.ExeFile ?? string.Empty);
                 entry.Size = (uint)Marshal.SizeOf<NativeMethods.ProcessEntry32>();
             }
             while (NativeMethods.Process32Next(snapshot, ref entry));
@@ -105,6 +139,4 @@ internal static class ProcessClassifier
 
         return result;
     }
-
-    private readonly record struct ProcessInfo(uint ParentId, string Executable);
 }

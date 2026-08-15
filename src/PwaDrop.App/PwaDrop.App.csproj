@@ -22,4 +22,46 @@
   <ItemGroup>
     <InternalsVisibleTo Include="PwaDrop.DragHarness" />
   </ItemGroup>
+  <Target Name="BuildSourceHookRuntime" BeforeTargets="Build">
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\build-native-hook.ps1&quot; -Configuration $(Configuration)" />
+  </Target>
+  <Target Name="ValidateSourceHookRuntime" DependsOnTargets="BuildSourceHookRuntime">
+    <ReadLinesFromFile File="$(MSBuildProjectDirectory)\..\..\native\build-msvc-current.txt">
+      <Output TaskParameter="Lines" ItemName="SourceHookGenerationLine" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <SourceHookGeneration>@(SourceHookGenerationLine)</SourceHookGeneration>
+      <SourceHookOutput>$(MSBuildProjectDirectory)\..\..\native\build-msvc-generations\$(SourceHookGeneration)\out</SourceHookOutput>
+    </PropertyGroup>
+    <ItemGroup>
+      <RequiredSourceHookRuntime Include="$(SourceHookOutput)\PwaDrop.HookHost.exe" />
+      <RequiredSourceHookRuntime Include="$(SourceHookOutput)\PwaDrop.Hook.dll" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(RequiredSourceHookRuntime.Identity)')"
+           Text="Required source-hook runtime file is missing: %(RequiredSourceHookRuntime.Identity)" />
+  </Target>
+  <Target Name="CopySourceHookRuntime" AfterTargets="Build" DependsOnTargets="ValidateSourceHookRuntime">
+    <ItemGroup>
+      <SourceHookRuntime Include="@(RequiredSourceHookRuntime)" />
+    </ItemGroup>
+    <MakeDir Directories="$(OutDir)Hook\$(SourceHookGeneration)" />
+    <Copy SourceFiles="@(SourceHookRuntime)"
+          DestinationFolder="$(OutDir)Hook\$(SourceHookGeneration)"
+          SkipUnchangedFiles="true" />
+    <WriteLinesToFile File="$(OutDir)Hook\current.txt"
+                      Lines="$(SourceHookGeneration)"
+                      Overwrite="true" />
+  </Target>
+  <Target Name="CopySourceHookRuntimeToPublish" AfterTargets="Publish" DependsOnTargets="ValidateSourceHookRuntime">
+    <ItemGroup>
+      <PublishedSourceHookRuntime Include="@(RequiredSourceHookRuntime)" />
+    </ItemGroup>
+    <MakeDir Directories="$(PublishDir)Hook\$(SourceHookGeneration)" />
+    <Copy SourceFiles="@(PublishedSourceHookRuntime)"
+          DestinationFolder="$(PublishDir)Hook\$(SourceHookGeneration)"
+          SkipUnchangedFiles="true" />
+    <WriteLinesToFile File="$(PublishDir)Hook\current.txt"
+                      Lines="$(SourceHookGeneration)"
+                      Overwrite="true" />
+  </Target>
 </Project>

@@ -3,44 +3,48 @@
 PWADrop is a tray application with three deliberately small layers:
 
 - `PwaDrop.Core` owns filename safety, settings, and cache lifecycle without Windows dependencies.
-- `PwaDrop.App` owns source detection, OLE interop, original-drag priming, legacy virtual-file materialization, tray UI, and settings.
+- `PwaDrop.AsyncDrag` provides a managed contract test for the asynchronous-operation lifetime rule.
+- `PwaDrop.App` owns allowlisted process discovery, hook deployment, tray UI, and settings.
+- The native `PwaDrop.HookHost` performs a policy-checked `LoadLibraryW` injection without changing another thread's context.
+- The native `PwaDrop.Hook` replaces the `DoDragDrop` import-address-table entry in `msedge.dll`, `chrome.dll`, or an allowlisted Electron executable.
 - `PwaDrop.DragHarness` produces Chromium-style delayed `CF_HDROP` and provides a target that accepts only `FileDrop` paths.
 
-## Relay lifecycle
+## Source-hook lifecycle
 
-1. A low-level, same-user mouse hook records a candidate drag only when the source window belongs to a recognized Chromium, installed-PWA, WebView2, or test-harness process.
-2. Once the Windows drag threshold is crossed and the cursor leaves the source app, a non-activating transparent window becomes the OLE target.
-3. If the data object advertises asynchronous `CF_HDROP`, PWADrop calls `StartOperation` during `DragEnter`, marks that gesture as primed, and immediately hides its window.
-4. The overlay remains suppressed for the rest of the gesture, allowing Windows OLE to deliver the same original `IDataObject` to the underlying browser or application.
-5. When the user releases the mouse, the destination's ordinary `GetData(CF_HDROP)` call can trigger Chromium's authenticated download because the async operation is already active.
-6. PWADrop retains the async capability briefly and calls `EndOperation` after the destination has had time to retrieve the data.
-7. Legacy `FileGroupDescriptorW`/`FileContents` sources still use sanitized cache materialization and physical replay as a compatibility fallback.
+1. A permission-free WinEvent hook reports top-level window creation. PWADrop coalesces each burst for 250 ms, captures the process tree once, and reconciles eligible roots. One 30-second safety reconciliation covers silent background starts; a 5-second fallback is used only if event registration fails.
+2. Source policy recognizes root processes for Edge, Chrome, Brave, Chromium, Opera, Vivaldi, Comet, Slack, Missive, and Superhuman. WebView2 is narrower: its root must descend from New Outlook or New Teams.
+3. Before injection, both the tray and native helper independently verify the PID creation time, x64 architecture, current session and user, medium integrity, canonical hook path, and root-process relationship. The helper also requires Windows-trusted Authenticode for production targets.
+4. The short-lived native helper starts `LoadLibraryW` on a new remote thread. It never suspends a Chromium thread or calls `SetThreadContext`.
+5. The helper passes a cryptographically random nonce through target-owned memory to the DLL's exported bootstrap function. Fresh nonce-qualified events acknowledge success or failure; stale or pre-existing events are rejected.
+6. `DllMain` performs no hook work and creates no threads. The exported bootstrap changes only the selected module's writable `ole32!DoDragDrop` IAT slot. Both binaries opt into Control Flow Guard and CET compatibility.
+7. Ordinary and non-asynchronous data objects pass straight through.
+8. For an asynchronous object, the hook owns `StartOperation`, triggers source materialization, obtains and validates `CF_HDROP`, and pairs the operation with exactly one `EndOperation`.
+9. The original drop source, cursor, allowed effects, and destination remain unchanged. A narrow `IDataObject` wrapper serves the retained physical file drop, delegates compatible formats, and suppresses only `chromium/x-renderer-taint`.
+10. A current-user-only named event makes installed hooks pass through immediately whenever the tray setting is paused.
 
-The primer never synthesizes mouse input, starts a replacement drag, or injects a DLL into a source process. If OLE does not preserve the primed state while retargeting on supported Windows builds, any future source-side `DoDragDrop` hook requires a separate security review; input simulation is not acceptable.
+The abandoned relay/replay implementation remains temporarily in the tree for comparison, but the application no longer starts its mouse monitor or overlay. It cannot cover the desktop or intercept the user's clicks.
 
 ## COM ownership
 
 - The app runs in an STA and explicitly initializes OLE.
-- Every `STGMEDIUM` returned by the source is released with `ReleaseStgMedium`.
-- Async Chromium data remains owned by the original source and destination; PWADrop does not request or copy it.
-- Legacy virtual streams are copied sequentially and never buffered as complete files.
-- The test harness implements `IDataObjectAsyncCapability`, refuses early data requests, and allocates a movable `DROPFILES` block only after `StartOperation`.
-- The primed async-capability pointer is retained for at most two minutes and completed idempotently after release or shutdown.
+- The hook queries `IDataObjectAsyncCapability` and wraps only successfully materialized file drags.
+- The wrapper deep-copies the `CF_HDROP` storage, delegates other formats, and correctly filters the renderer-taint format from `QueryGetData`, `GetData`, and `EnumFormatEtc`.
+- The hook never changes allowed effects or the result returned by the original `DoDragDrop`.
+- The test harness implements `IDataObjectAsyncCapability` and refuses early data requests.
+- `StartOperation` is paired with exactly one `EndOperation` on both success and failure paths.
 
 ## Security invariants
 
 - PWADrop runs at `asInvoker`; it cannot bridge into elevated targets.
-- Source recognition is based on the top-level process tree, not page text or filenames.
-- Only legacy fallback materialization writes to the current user's local application-data directory.
-- Legacy partial files use a `.partial` suffix and are atomically renamed after complete writes.
-- Legacy cached web-origin files receive `Zone.Identifier` with `ZoneId=3` when NTFS supports it.
+- Injection is limited to explicitly recognized, trusted-signed roots in the current user/session at non-elevated integrity and x64 architecture. WebView2 additionally requires a New Outlook or New Teams ancestor.
+- The hook does not inspect page text, filenames, paths, URLs, or file contents.
 - Logs and notifications must never contain email subjects, file names, URLs, or content.
-- Diagnostics are limited to payload kind, file count, elapsed time, HRESULT, and drop effect.
+- Diagnostics are limited to operation type, elapsed time, HRESULT, and drop effect.
 - The project has no network client and no telemetry dependency.
 
 ## Current technical risk
 
-The public-API priming design needs interactive Windows validation because PWADrop briefly participates as an OLE target and then retargets the original drag. The included harness deterministically verifies the `StartOperation` state transition and target-side `CF_HDROP` rendering before testing against production source apps or a real ticketing system.
+Source injection may be rejected by Chromium code-integrity policy, endpoint protection, Smart App Control, or enterprise policy. The native probe verifies injection, IAT replacement, taint filtering, and exact `StartOperation`/`EndOperation` ordering without involving a real application. Production validation must still be completed for every named source family. Unknown applications and unrelated WebView2 processes must remain untouched.
 
 Primary platform references:
 

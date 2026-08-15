@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/PwaDrop.App/PwaDrop.App.csproj" />
+    <Project Path="src/PwaDrop.AsyncDrag/PwaDrop.AsyncDrag.csproj" />
     <Project Path="src/PwaDrop.Core/PwaDrop.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
