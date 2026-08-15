@@ -26,13 +26,15 @@ test("server-renders the PWADrop landing page", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 
-test("privacy route has complete route-specific metadata", async () => {
+test("privacy route has a concise no-collection policy and route-specific metadata", async () => {
   const response = await render("/privacy");
   const html = await response.text();
   assert.equal(response.status, 200);
   assert.match(html, /<title>Privacy Policy — PWADrop<\/title>/i);
   assert.match(html, /Effective August 15, 2026/);
-  assert.match(html, /does not automatically upload diagnostic logs/i);
+  assert.match(html, /does not collect or send personal information/i);
+  assert.match(html, /items you choose to drag/i);
+  assert.doesNotMatch(html, /HRESULT|process identity|temporary directory|compatibility-cache/i);
   assert.doesNotMatch(html, /og\.png/);
 });
 
