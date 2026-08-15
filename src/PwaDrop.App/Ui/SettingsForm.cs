@@ -133,6 +133,23 @@ internal sealed class SettingsForm : Form
         SetStatus(settings.Enabled ? "Bridge active" : "Bridge paused");
     }
 
+    internal void SetStartupManaged(bool managed)
+    {
+        _startupToggle.Enabled = !managed;
+        _startupToggle.Cursor = managed ? Cursors.Default : Cursors.Hand;
+        if (_startupToggle.Parent is Control startupRow)
+        {
+            startupRow.Cursor = managed ? Cursors.Default : Cursors.Hand;
+        }
+        _startupToggle.AccessibleDescription = managed
+            ? "Managed for all users by your administrator."
+            : "Launch PWADrop automatically when you sign in.";
+        if (_startupToggle.Tag is Label descriptionLabel)
+        {
+            descriptionLabel.Text = _startupToggle.AccessibleDescription;
+        }
+    }
+
     internal void SetStatus(string status)
     {
         if (InvokeRequired)
@@ -744,15 +761,24 @@ internal sealed class SettingsForm : Form
             rowToggle.Left = row.ClientSize.Width - rowToggle.Width - 4;
             descriptionLabel.Width = Math.Max(240, rowToggle.Left - descriptionLabel.Left - 24);
         };
-        row.Click += (_, _) => rowToggle.Checked = !rowToggle.Checked;
-        titleLabel.Click += (_, _) => rowToggle.Checked = !rowToggle.Checked;
-        descriptionLabel.Click += (_, _) => rowToggle.Checked = !rowToggle.Checked;
+        row.Click += (_, _) => ToggleIfEnabled(rowToggle);
+        titleLabel.Click += (_, _) => ToggleIfEnabled(rowToggle);
+        descriptionLabel.Click += (_, _) => ToggleIfEnabled(rowToggle);
 
         row.Controls.Add(titleLabel);
         row.Controls.Add(descriptionLabel);
         row.Controls.Add(rowToggle);
+        rowToggle.Tag = descriptionLabel;
         toggle = rowToggle;
         return row;
+    }
+
+    private static void ToggleIfEnabled(FluentToggle toggle)
+    {
+        if (toggle.Enabled)
+        {
+            toggle.Checked = !toggle.Checked;
+        }
     }
 
     private static NavigationButton CreateNavigationButton(string text, string glyph, int top)

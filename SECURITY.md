@@ -9,6 +9,7 @@ Do not open a public issue for a vulnerability that could expose file contents, 
 ## Security boundaries
 
 - PWADrop runs at the current user's integrity level and does not request elevation.
+- A machine-wide installation changes only file placement and startup registration. It starts one ordinary PWADrop process per interactive user session and never turns the bridge into an elevated service.
 - It does not authenticate to Microsoft 365, read browser cookies, or send telemetry.
 - It injects only into an explicit x64 Chromium-browser or Electron root, or a WebView2 root descended from New Outlook/New Teams, in the current user's session and at non-elevated integrity.
 - Except for the deterministic local probe, every target executable must have a Windows-trusted Authenticode signature and belong to an explicit source family. Ordinary Chromium shells, games, anti-cheat processes, overlays, and unsigned lookalikes are never candidates.
@@ -20,3 +21,4 @@ Do not open a public issue for a vulnerability that could expose file contents, 
 - Async Chromium files remain in the original source-to-target OLE operation. PWADrop validates the materialized paths and retains only the Windows `CF_HDROP` handle needed by the destination; it does not open or copy file contents.
 - PWADrop does not attempt to bridge into elevated target applications.
 - Redacted diagnostics contain only operation type, timing, HRESULT, and drop effect; they never include names, subjects, paths, URLs, or content.
+- Public and enterprise releases must Authenticode-sign the app, native helper, hook DLL, installer, and uninstaller. Administrators should prefer the machine-wide `%ProgramFiles%` installation when policy blocks execution from user-writable locations.

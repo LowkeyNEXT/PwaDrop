@@ -6,7 +6,7 @@
 - Guarded browser, New Outlook/New Teams WebView2, and named Electron root injection with CFG/CET-compatible `DoDragDrop` IAT interception
 - Event-driven source discovery with a low-frequency safety reconciliation
 - Asynchronous `CF_HDROP` activation using `IDataObjectAsyncCapability`
-- Tray/settings experience and branded MSIX setup
+- Tray/settings experience, single-EXE setup, per-user and all-users install modes, and branded MSIX packaging
 - Deterministic source/target harness
 
 ## 0.2 — Compatibility beta
@@ -22,7 +22,7 @@
 - Additional source-specific compatibility adapters based on verified executable identities
 - ARM64 builds
 - Additional WebView2/Electron clients beyond the current Teams, Slack, Missive, and Superhuman families
-- Enterprise policy surface for startup, cache lifetime, and diagnostics
+- Additional enterprise policy surface for cache lifetime and diagnostics
 - Optional browser extension for richer browser-only feedback, never as a requirement
 
 `.msg` conversion and Microsoft Graph conversation expansion are intentionally out of scope unless a concrete destination rejects standards-based `.eml` files.

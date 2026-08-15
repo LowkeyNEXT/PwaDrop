@@ -19,6 +19,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private readonly NotifyIcon _trayIcon;
     private readonly ToolStripMenuItem _statusMenuItem;
     private readonly ToolStripMenuItem _enabledMenuItem;
+    private bool _startupManaged;
     private SettingsForm? _settingsForm;
     private AppSettings _settings;
 
@@ -30,6 +31,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         _settingsPath = Path.Combine(_dataPath, "settings.json");
         _diagnostics = new DiagnosticLog(Path.Combine(_dataPath, "diagnostics.log"));
         _settings = AppSettings.Load(_settingsPath);
+        SynchronizeStartupState();
         _cache = new CacheManager(Path.Combine(_dataPath, "Cache"));
         _cache.PurgeExpired(DateTimeOffset.UtcNow);
         _sourceHookManager = new SourceHookManager(
@@ -134,8 +136,19 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
                     _settingsForm?.ApplySettings(_settings);
                     ShowError("Windows did not allow PWADrop to change its startup setting.", 0);
                 }
+
+                var startupState = await StartupRegistration.GetStateAsync();
+                _startupManaged = startupState.Managed;
+                if (_settings.StartWithWindows != startupState.Enabled)
+                {
+                    _settings = _settings with { StartWithWindows = startupState.Enabled };
+                    _settingsForm?.ApplySettings(_settings);
+                }
+                _settingsForm?.SetStartupManaged(_startupManaged);
             }
-            catch (Exception exception) when (exception is UnauthorizedAccessException or COMException)
+            catch (Exception exception) when (
+                exception is UnauthorizedAccessException or COMException or IOException or
+                System.Security.SecurityException)
             {
                 _settings = _settings with { StartWithWindows = false };
                 _settingsForm?.ApplySettings(_settings);
@@ -162,8 +175,29 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
     private SettingsForm CreateSettingsForm()
     {
         var form = new SettingsForm(_settings, _cache.RootPath, _diagnostics.Path);
+        form.SetStartupManaged(_startupManaged);
         form.SettingsChanged += settings => ApplySettings(settings);
         return form;
+    }
+
+    private void SynchronizeStartupState()
+    {
+        try
+        {
+            var state = StartupRegistration.GetStateAsync().GetAwaiter().GetResult();
+            _startupManaged = state.Managed;
+            if (_settings.StartWithWindows != state.Enabled)
+            {
+                _settings = _settings with { StartWithWindows = state.Enabled };
+                _settings.Save(_settingsPath);
+            }
+        }
+        catch (Exception exception) when (
+            exception is UnauthorizedAccessException or COMException or IOException or
+            System.Security.SecurityException)
+        {
+            _startupManaged = false;
+        }
     }
 
     private void SetStatus(string status)

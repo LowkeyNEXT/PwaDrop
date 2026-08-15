@@ -9,6 +9,12 @@ PWADrop is a tray application with three deliberately small layers:
 - The native `PwaDrop.Hook` replaces the `DoDragDrop` import-address-table entry in `msedge.dll`, `chrome.dll`, or an allowlisted Electron executable.
 - `PwaDrop.DragHarness` produces Chromium-style delayed `CF_HDROP` and provides a target that accepts only `FileDrop` paths.
 
+## Installation model
+
+The public installer is one self-contained setup executable. Windows still requires the native hook DLL and its short-lived host to exist as real files, so setup keeps them in a private generation-specific `Hook` directory beside the installed app. PDB files are published separately and never enter an end-user installation.
+
+A current-user install uses `%LOCALAPPDATA%\Programs\PWADrop` and `HKCU` startup registration without elevation. An all-users install uses `%ProgramFiles%\PWADrop` and `HKLM` startup registration, but Windows launches a separate medium-integrity process for each interactive user. There is deliberately no service, cross-session broker, or elevated runtime. Settings, diagnostics, and cache files always stay in each user's `%LOCALAPPDATA%\PwaDrop` directory.
+
 ## Source-hook lifecycle
 
 1. A permission-free WinEvent hook reports top-level window creation. PWADrop coalesces each burst for 250 ms, captures the process tree once, and reconciles eligible roots. One 30-second safety reconciliation covers silent background starts; a 5-second fallback is used only if event registration fails.
@@ -36,6 +42,7 @@ The abandoned relay/replay implementation remains temporarily in the tree for co
 ## Security invariants
 
 - PWADrop runs at `asInvoker`; it cannot bridge into elevated targets.
+- Per-user and all-users installations run the same medium-integrity binary. Installation elevation is never inherited by the runtime.
 - Injection is limited to explicitly recognized, trusted-signed roots in the current user/session at non-elevated integrity and x64 architecture. WebView2 additionally requires a New Outlook or New Teams ancestor.
 - The hook does not inspect page text, filenames, paths, URLs, or file contents.
 - Logs and notifications must never contain email subjects, file names, URLs, or content.

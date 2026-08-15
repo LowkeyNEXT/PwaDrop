@@ -42,7 +42,9 @@ sequenceDiagram
 
 Chromium advertises download-on-drop items as `CF_HDROP`, but can defer rendering until `IDataObjectAsyncCapability.StartOperation` has been called. Some destinations do not negotiate that optional interface. PWADrop completes that negotiation inside the recognized source process, retains Chromium's materialized file-drop handle, and lets the original drag continue with standard Windows file semantics. See the [architecture notes](docs/ARCHITECTURE.md).
 
-## Build and run
+## Contributor build
+
+The supported, signed release is distributed through the Microsoft Store and official installers. The source tree is provided for review, noncommercial use permitted by the license, and development contributions; local builds are unsigned development builds and are not a substitute for the supported release channel.
 
 Requirements:
 
@@ -52,10 +54,30 @@ Requirements:
 
 ```powershell
 .\scripts\build.ps1
-dotnet run --project .\src\PwaDrop.App\PwaDrop.App.csproj
 ```
 
-PWADrop starts in the notification area. Double-click its icon to open the settings window. Use **Diagnostics** from the menu to inspect redacted hook events.
+The build script restores the managed projects, compiles the native source hook, and runs both managed and native test suites. Contributors can then launch the development app with:
+
+```powershell
+dotnet run --configuration Release --project .\src\PwaDrop.App\PwaDrop.App.csproj
+```
+
+PWADrop starts in the notification area. Double-click its icon to open the settings window. Development builds require the full native toolchain above and may be blocked by Windows application-control protections because they are not signed by the release publisher.
+
+## Install
+
+For normal use, download and run `PWADrop-Setup-vX.Y.Z-win-x64.exe`. The setup file is a single executable and contains the complete self-contained runtime.
+
+Production installers must be Authenticode-signed. Windows Smart App Control, SmartScreen, or an enterprise application-control policy may block an unsigned development build even when its checksum is correct.
+
+- **Current user** is the default and requires no administrator access. PWADrop installs under `%LOCALAPPDATA%\Programs\PWADrop`.
+- **All users** is available from the install-scope page and requires administrator approval. PWADrop installs under `%ProgramFiles%\PWADrop`.
+- **Start with Windows** is selected by default. A current-user install starts only for that user; an all-users install starts one normal, non-elevated PWADrop process in each interactive user session.
+- Add or remove PWADrop later through Windows **Installed apps**. Per-user settings and diagnostics remain under `%LOCALAPPDATA%\PwaDrop`.
+
+The installed folder contains a small private `Hook` directory because Windows must load the native bridge DLL from a real file. Users do not need to open or manage that directory. Release installers exclude PDB and other developer-only files.
+
+Administrators can use the documented silent install, signing, Intune, and App Control options in the [enterprise deployment guide](docs/ENTERPRISE-DEPLOYMENT.md).
 
 ### Test with deterministic .NET targets
 
@@ -75,16 +97,26 @@ dotnet run --project .\tests\PwaDrop.WpfDropTarget\PwaDrop.WpfDropTarget.csproj
 
 For a browser destination, open [`tests/browser-drop-target/index.html`](tests/browser-drop-target/index.html) in Edge or Chrome and drag the harness source onto its drop zone.
 
-### Build an MSIX
+### Build the Microsoft Store package
 
 ```powershell
-.\scripts\create-dev-certificate.ps1
-.\scripts\package-msix.ps1 `
-  -CertificatePath .\artifacts\PwaDrop-Development.pfx `
-  -CertificatePassword pwadrop-dev
+.\scripts\package-msix.ps1
 ```
 
-Development certificates and packages are ignored by git. Release packages must use a trusted code-signing certificate whose subject matches the manifest publisher.
+The Store-assigned PWADrop identity is built in. The upload-ready `.msixupload`, raw `.msix`, SHA-256 checksums, and package metadata are written under `artifacts\store\<version>`. The Store submission package can be unsigned because Microsoft signs it during ingestion; local sideload testing still requires a trusted certificate whose subject exactly matches the manifest publisher.
+
+This uses the Windows SDK command-line tools already installed on the build machine. Visual Studio Community and a Visual Studio account sign-in are not required.
+
+### Build the single-file installer
+
+Install the Inno Setup compiler, then run:
+
+```powershell
+winget install --id JRSoftware.InnoSetup --exact
+.\scripts\package-installer.ps1
+```
+
+The installer and its checksum are written under `artifacts\installer\<version>\output`.
 
 ## Privacy and compatibility
 

@@ -20,7 +20,18 @@ Record results in a pull request before marking an installer as beta. Never test
 
 Pass criterion: injection succeeds without `SetThreadContext`, the IAT hook is installed, and `StartOperation`/`EndOperation` are each observed exactly once.
 
-## Gate 2: desktop .NET targets
+## Gate 2: installation lifecycle
+
+1. Run `scripts\package-installer.ps1` and confirm the output is one setup executable plus its checksum file.
+2. Run `scripts\test-installer.ps1 -SkipLaunch` on unsigned CI artifacts to verify current-user install, startup selection, upgrade, and uninstall without administrator access. This is packaging validation, not a release-signing substitute.
+3. On a clean VM, interactively test the default current-user location and the all-users location. Confirm Installed Apps, Start menu, optional desktop shortcut, startup selection, repair/upgrade, and uninstall behavior.
+4. Confirm the runtime install contains no `.pdb` files and that its `Hook\current.txt` points to a complete generation directory.
+5. For a signed candidate, run `scripts\test-installer.ps1` without `-SkipLaunch`, then verify Authenticode on `PwaDrop.exe`, `PwaDrop.HookHost.exe`, `PwaDrop.Hook.dll`, setup, and the installed uninstaller.
+6. With two non-administrator test accounts, install for all users, sign into each account, and confirm exactly one non-elevated tray process and independent per-user settings/data.
+
+Pass criterion: both scopes install and update cleanly, startup matches the selected or managed policy, no elevated runtime remains, and uninstall removes program files and registration without deleting per-user data.
+
+## Gate 3: desktop .NET targets
 
 1. Run `PwaDrop.DragHarness` without PWADrop and confirm its baseline behavior.
 2. Run `PwaDrop.WpfDropTarget` and confirm ordinary physical drops still work.
@@ -28,7 +39,7 @@ Pass criterion: injection succeeds without `SetThreadContext`, the IAT hook is i
 
 Pass criterion: both targets receive ordinary physical file paths and remain responsive; neither target needs a PWADrop SDK, extension, or custom data format.
 
-## Gate 3: production source apps
+## Gate 4: production source apps
 
 Test each row with one email, multiple selected emails, one attachment, and multiple attachments:
 
@@ -44,7 +55,7 @@ Also test duplicate names, Unicode, shared mailbox items, an attachment over 10 
 
 Repeat the browser rows for Edge, Chrome, Brave, Opera, Vivaldi, and Comet when installed. Repeat the app rows for New Teams, Slack, Missive, and Superhuman when claimed. Test both a single item and multi-select, `%`/`#` characters, long paths, cross-origin web frames, and Office documents that normally open a preview.
 
-## Gate 4: privacy and process safety
+## Gate 5: privacy and process safety
 
 - Confirm the hook is loaded only into allowlisted, same-user, same-session, non-elevated source processes.
 - Pause PWADrop and confirm already-installed hooks immediately pass ordinary and asynchronous drags through.

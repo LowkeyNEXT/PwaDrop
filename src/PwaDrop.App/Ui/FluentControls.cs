@@ -35,12 +35,21 @@ internal sealed class FluentToggle : CheckBox
 
         var track = new RectangleF(1.5f, 2.5f, Width - 3f, Height - 5f);
         using var trackPath = RoundedRectangle(track, track.Height / 2f);
+        var trackStart = Enabled
+            ? Checked ? FluentTheme.Accent : Color.FromArgb(27, 36, 59)
+            : Color.FromArgb(47, 55, 75);
+        var trackEnd = Enabled
+            ? Checked ? FluentTheme.AccentSecondary : Color.FromArgb(27, 36, 59)
+            : Color.FromArgb(47, 55, 75);
         using var trackBrush = new LinearGradientBrush(
             track,
-            Checked ? FluentTheme.Accent : Color.FromArgb(27, 36, 59),
-            Checked ? FluentTheme.AccentSecondary : Color.FromArgb(27, 36, 59),
+            trackStart,
+            trackEnd,
             0f);
-        using var borderPen = new Pen(Checked ? Color.FromArgb(118, 143, 255) : Color.FromArgb(107, 119, 148), 1.2f);
+        var borderColor = Enabled
+            ? Checked ? Color.FromArgb(118, 143, 255) : Color.FromArgb(107, 119, 148)
+            : Color.FromArgb(79, 88, 110);
+        using var borderPen = new Pen(borderColor, 1.2f);
         eventArgs.Graphics.FillPath(trackBrush, trackPath);
         eventArgs.Graphics.DrawPath(borderPen, trackPath);
 
@@ -49,7 +58,7 @@ internal sealed class FluentToggle : CheckBox
         var thumb = new RectangleF(thumbX, 6f, thumbSize, thumbSize);
         using var shadow = new SolidBrush(Color.FromArgb(45, 0, 0, 0));
         eventArgs.Graphics.FillEllipse(shadow, thumb.X, thumb.Y + 1.5f, thumb.Width, thumb.Height);
-        using var thumbBrush = new SolidBrush(Color.White);
+        using var thumbBrush = new SolidBrush(Enabled ? Color.White : Color.FromArgb(166, 172, 187));
         eventArgs.Graphics.FillEllipse(thumbBrush, thumb);
 
         if (Focused && ShowFocusCues)
