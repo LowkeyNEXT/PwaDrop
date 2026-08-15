@@ -341,6 +341,16 @@ bool GetProcessEntry(DWORD processId, PROCESSENTRY32W* result)
     return false;
 }
 
+bool IsNativeProbeProcess(DWORD processId)
+{
+    const std::wstring expectedProbe = FullPath(
+        (HostDirectory() + L"\\PwaDrop.NativeProbe.exe").c_str());
+    const std::wstring actualProbe = ProcessImagePath(processId);
+    return !expectedProbe.empty() &&
+        !actualProbe.empty() &&
+        _wcsicmp(expectedProbe.c_str(), actualProbe.c_str()) == 0;
+}
+
 bool IsAllowedRootProcess(DWORD processId)
 {
     PROCESSENTRY32W target{};
@@ -352,12 +362,7 @@ bool IsAllowedRootProcess(DWORD processId)
     const std::wstring targetName = target.szExeFile;
     if (_wcsicmp(targetName.c_str(), L"PwaDrop.NativeProbe.exe") == 0)
     {
-        const std::wstring expectedProbe = FullPath(
-            (HostDirectory() + L"\\PwaDrop.NativeProbe.exe").c_str());
-        const std::wstring actualProbe = ProcessImagePath(processId);
-        return !expectedProbe.empty() &&
-            !actualProbe.empty() &&
-            _wcsicmp(expectedProbe.c_str(), actualProbe.c_str()) == 0;
+        return IsNativeProbeProcess(processId);
     }
 
     const std::wstring targetPath = ProcessImagePath(processId);
@@ -1075,7 +1080,7 @@ int wmain(int argc, wchar_t** argv)
     {
         return kUserRejected;
     }
-    if (!IsNotElevated(process))
+    if (!IsNotElevated(process) && !IsNativeProbeProcess(processId))
     {
         return kElevationRejected;
     }
