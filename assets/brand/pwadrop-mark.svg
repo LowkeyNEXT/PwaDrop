@@ -1,12 +1,15 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="surface" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#4A6AFF"/>
-      <stop offset="1" stop-color="#7D4CFF"/>
+    <linearGradient id="handoff" x1="70" y1="100" x2="440" y2="425" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6F28FF"/>
+      <stop offset="0.58" stop-color="#125BFF"/>
+      <stop offset="1" stop-color="#13D8F4"/>
     </linearGradient>
   </defs>
-  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#surface)"/>
-  <path d="M164 170V342M348 170V342" stroke="white" stroke-width="48" stroke-linecap="round"/>
-  <path d="M164 256C208 205 304 307 348 256" stroke="white" stroke-width="48" stroke-linecap="round" fill="none"/>
+  <path d="M76 323C156 196 290 185 382 282" stroke="url(#handoff)" stroke-width="62" stroke-linecap="round"/>
+  <path d="M369 238V345M321 302L369 350L417 302" stroke="#13D8F4" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M131 119H258L321 182V304H131V119Z" fill="white" stroke="#B9D7FF" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M258 119V182H321" fill="#13D8F4" stroke="#B9D7FF" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M70 180H119M55 230H119M72 280H119" stroke="url(#handoff)" stroke-width="24" stroke-linecap="round"/>
+  <ellipse cx="369" cy="398" rx="64" ry="27" stroke="url(#handoff)" stroke-width="22"/>
 </svg>
-

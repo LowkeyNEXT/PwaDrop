@@ -17,7 +17,7 @@
     <ProjectReference Include="../PwaDrop.Core/PwaDrop.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Assets\PWADropBridgeHero.png" />
+    <EmbeddedResource Include="Assets\PwaDropLogo.png" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PwaDrop.DragHarness" />

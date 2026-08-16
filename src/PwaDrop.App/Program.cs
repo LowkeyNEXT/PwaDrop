@@ -50,22 +50,18 @@ internal static class Program
 
         var renderMode = args[0].ToLowerInvariant();
         if (renderMode is not ("--render-settings" or "--render-settings-min" or
-            "--render-settings-managed" or "--render-about"))
+            "--render-settings-managed" or "--render-preferences"))
         {
             return false;
         }
 
-        var previewRoot = Path.Combine(Path.GetTempPath(), "PWADrop.UiPreview");
         var managedStartup = renderMode == "--render-settings-managed";
-        using var form = new SettingsForm(
-            new AppSettings(StartWithWindows: managedStartup),
-            Path.Combine(previewRoot, "Cache"),
-            Path.Combine(previewRoot, "diagnostics.log"));
+        using var form = new SettingsForm(new AppSettings(StartWithWindows: managedStartup));
         form.SetStartupManaged(managedStartup);
-        var pageName = renderMode == "--render-about" ? "About" : "Overview";
+        var pageName = renderMode == "--render-preferences" ? "Settings" : "Overview";
         var renderSize = renderMode == "--render-settings-min"
-            ? new Size(900, 700)
-            : new Size(1034, 782);
+            ? new Size(760, 620)
+            : new Size(920, 760);
         form.RenderTo(args[1], pageName, renderSize);
         return true;
     }

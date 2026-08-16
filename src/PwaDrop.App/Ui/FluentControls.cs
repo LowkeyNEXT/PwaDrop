@@ -31,7 +31,7 @@ internal sealed class FluentToggle : CheckBox
     protected override void OnPaint(PaintEventArgs eventArgs)
     {
         eventArgs.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-        eventArgs.Graphics.Clear(FluentTheme.Canvas);
+        eventArgs.Graphics.Clear(Parent?.BackColor ?? FluentTheme.Canvas);
 
         var track = new RectangleF(1.5f, 2.5f, Width - 3f, Height - 5f);
         using var trackPath = RoundedRectangle(track, track.Height / 2f);
@@ -71,6 +71,106 @@ internal sealed class FluentToggle : CheckBox
     private static GraphicsPath RoundedRectangle(RectangleF bounds, float radius)
     {
         var diameter = radius * 2f;
+        var path = new GraphicsPath();
+        path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);
+        path.AddArc(bounds.Right - diameter, bounds.Bottom - diameter, diameter, diameter, 0, 90);
+        path.AddArc(bounds.Left, bounds.Bottom - diameter, diameter, diameter, 90, 90);
+        path.CloseFigure();
+        return path;
+    }
+}
+
+internal sealed class FluentTabButton : Button
+{
+    private bool _selected;
+    private bool _hot;
+
+    internal FluentTabButton(string text, string glyph)
+    {
+        Text = text;
+        Glyph = glyph;
+        AccessibleName = text;
+        AccessibleRole = AccessibleRole.PageTab;
+        FlatStyle = FlatStyle.Flat;
+        FlatAppearance.BorderSize = 0;
+        BackColor = Color.Transparent;
+        ForeColor = FluentTheme.TextSecondary;
+        Cursor = Cursors.Hand;
+        TabStop = true;
+        SetStyle(ControlStyles.AllPaintingInWmPaint |
+                 ControlStyles.OptimizedDoubleBuffer |
+                 ControlStyles.ResizeRedraw |
+                 ControlStyles.UserPaint |
+                 ControlStyles.SupportsTransparentBackColor, true);
+    }
+
+    internal string Glyph { get; }
+
+    [Browsable(false)]
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    internal bool Selected
+    {
+        get => _selected;
+        set
+        {
+            if (_selected == value)
+            {
+                return;
+            }
+
+            _selected = value;
+            ForeColor = value ? FluentTheme.TextPrimary : FluentTheme.TextSecondary;
+            Invalidate();
+        }
+    }
+
+    protected override void OnMouseEnter(EventArgs eventArgs)
+    {
+        _hot = true;
+        Invalidate();
+        base.OnMouseEnter(eventArgs);
+    }
+
+    protected override void OnMouseLeave(EventArgs eventArgs)
+    {
+        _hot = false;
+        Invalidate();
+        base.OnMouseLeave(eventArgs);
+    }
+
+    protected override void OnPaint(PaintEventArgs eventArgs)
+    {
+        eventArgs.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        if (Selected || _hot)
+        {
+            using var background = new SolidBrush(Selected ? FluentTheme.SurfacePressed : FluentTheme.SurfaceHover);
+            using var path = RoundedRectangle(new RectangleF(1, 4, Width - 2, Height - 9), 22f);
+            eventArgs.Graphics.FillPath(background, path);
+        }
+
+        if (Selected)
+        {
+            using var indicator = new SolidBrush(FluentTheme.Accent);
+            using var path = RoundedRectangle(new RectangleF((Width - 36) / 2f, Height - 4, 36, 3), 1.5f);
+            eventArgs.Graphics.FillPath(indicator, path);
+        }
+
+        using var iconFont = FluentTheme.Symbols(13.5f);
+        using var textFont = FluentTheme.Text(10.5f, Selected ? FontStyle.Bold : FontStyle.Regular);
+        using var brush = new SolidBrush(ForeColor);
+        eventArgs.Graphics.DrawString(Glyph, iconFont, brush, 17, 16);
+        eventArgs.Graphics.DrawString(Text, textFont, brush, 47, 16);
+
+        if (Focused && ShowFocusCues)
+        {
+            ControlPaint.DrawFocusRectangle(eventArgs.Graphics, Rectangle.Inflate(ClientRectangle, -5, -6));
+        }
+    }
+
+    private static GraphicsPath RoundedRectangle(RectangleF bounds, float radius)
+    {
+        var diameter = Math.Min(radius * 2f, Math.Min(bounds.Width, bounds.Height));
         var path = new GraphicsPath();
         path.AddArc(bounds.Left, bounds.Top, diameter, diameter, 180, 90);
         path.AddArc(bounds.Right - diameter, bounds.Top, diameter, diameter, 270, 90);

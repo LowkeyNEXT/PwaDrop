@@ -4,11 +4,14 @@ namespace PwaDrop.App.Diagnostics;
 
 internal sealed class DiagnosticLog
 {
+    private const long MaximumBytes = 1024 * 1024;
+    private const int RetainedBytes = 512 * 1024;
     private readonly object _gate = new();
 
     internal DiagnosticLog(string path)
     {
         Path = path;
+        TryPrune();
     }
 
     internal string Path { get; }
@@ -64,6 +67,7 @@ internal sealed class DiagnosticLog
                 File.AppendAllText(
                     Path,
                     $"{DateTimeOffset.UtcNow:O}\t{eventData}{Environment.NewLine}");
+                PruneIfNeeded();
             }
         }
         catch (IOException)
@@ -74,5 +78,51 @@ internal sealed class DiagnosticLog
         {
             // Managed devices may restrict local application data.
         }
+    }
+
+    private void TryPrune()
+    {
+        try
+        {
+            lock (_gate)
+            {
+                PruneIfNeeded();
+            }
+        }
+        catch (IOException)
+        {
+            // Logging is best effort and must never prevent PWADrop from starting.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Managed devices may restrict local application data.
+        }
+    }
+
+    private void PruneIfNeeded()
+    {
+        var file = new FileInfo(Path);
+        if (!file.Exists || file.Length <= MaximumBytes)
+        {
+            return;
+        }
+
+        var bytesToRead = (int)Math.Min(file.Length, RetainedBytes);
+        var tail = new byte[bytesToRead];
+        using (var source = new FileStream(Path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            source.Seek(-bytesToRead, SeekOrigin.End);
+            source.ReadExactly(tail);
+        }
+
+        var firstLineBreak = Array.IndexOf(tail, (byte)'\n');
+        var start = firstLineBreak >= 0 ? firstLineBreak + 1 : 0;
+        var temporaryPath = Path + ".prune";
+        using (var destination = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        {
+            destination.Write(tail, start, tail.Length - start);
+        }
+
+        File.Move(temporaryPath, Path, overwrite: true);
     }
 }

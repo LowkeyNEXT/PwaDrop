@@ -8,67 +8,51 @@ namespace PwaDrop.App.Ui;
 
 internal sealed class SettingsForm : Form
 {
-    private const int TitleBarHeight = 54;
-    private const int NavigationWidth = 258;
+    private const string ProductSite = "https://lowkeynext.github.io/PwaDrop/";
     private readonly FluentToggle _enabledToggle;
     private readonly FluentToggle _startupToggle;
     private readonly FluentToggle _notificationsToggle;
     private readonly Label _statusTitle;
     private readonly Label _statusSubtitle;
     private readonly Label _statusGlyph;
-    private Button _maximizeButton = null!;
-    private readonly Dictionary<NavigationButton, Control> _pages = [];
+    private readonly Dictionary<FluentTabButton, Control> _pages = [];
     private readonly Bitmap _brandBitmap;
-    private readonly Bitmap _bridgeBitmap;
     private bool _updating;
 
-    internal SettingsForm(AppSettings settings, string cachePath, string diagnosticsPath)
+    internal SettingsForm(AppSettings settings)
     {
         Text = "PWADrop";
         AccessibleName = "PWADrop settings";
         Icon = BrandIcon.CreateIcon();
         StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.None;
+        FormBorderStyle = FormBorderStyle.Sizable;
         AutoScaleMode = AutoScaleMode.Dpi;
         AutoScaleDimensions = new SizeF(96f, 96f);
-        MinimumSize = new Size(900, 700);
-        Size = new Size(1034, 782);
+        MinimumSize = new Size(760, 620);
+        Size = new Size(920, 760);
         BackColor = FluentTheme.Canvas;
         ForeColor = FluentTheme.TextPrimary;
         Font = FluentTheme.Text(10f);
         KeyPreview = true;
-        _brandBitmap = BrandIcon.CreateBitmap(96);
-        _bridgeBitmap = BrandIcon.CreateBridgeHeroBitmap();
+        _brandBitmap = BrandIcon.CreateBitmap(160);
 
         var root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             BackColor = FluentTheme.Canvas,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 3,
             Margin = Padding.Empty,
             Padding = Padding.Empty,
             GrowStyle = TableLayoutPanelGrowStyle.FixedSize
         };
         root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, TitleBarHeight));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 102));
+        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 56));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        var body = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = FluentTheme.Canvas,
-            ColumnCount = 2,
-            RowCount = 1,
-            Margin = Padding.Empty,
-            Padding = Padding.Empty,
-            GrowStyle = TableLayoutPanelGrowStyle.FixedSize
-        };
-        body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, NavigationWidth));
-        body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        body.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        var titleBar = CreateTitleBar();
-        var navigation = CreateNavigation();
+        var header = CreateHeader();
+        var tabs = CreateTabs(out var overviewTab, out var settingsTab);
         var contentHost = new Panel
         {
             Dock = DockStyle.Fill,
@@ -76,34 +60,21 @@ internal sealed class SettingsForm : Form
             Margin = Padding.Empty
         };
 
-        Controls.Add(root);
-        root.Controls.Add(titleBar, 0, 0);
-        root.Controls.Add(body, 0, 1);
-        body.Controls.Add(navigation, 0, 0);
-        body.Controls.Add(contentHost, 1, 0);
-
-        var overview = CreateOverviewPage(out _enabledToggle, out _startupToggle, out _notificationsToggle, out _statusTitle, out _statusSubtitle, out _statusGlyph);
-        var compatibility = CreateCompatibilityPage();
-        var diagnostics = CreateDiagnosticsPage(cachePath, diagnosticsPath);
-        var about = CreateAboutPage();
-
+        var overview = CreateOverviewPage(out _enabledToggle, out _statusTitle, out _statusSubtitle, out _statusGlyph);
+        var settingsPage = CreateSettingsPage(out _startupToggle, out _notificationsToggle);
         contentHost.Controls.Add(overview);
-        contentHost.Controls.Add(compatibility);
-        contentHost.Controls.Add(diagnostics);
-        contentHost.Controls.Add(about);
+        contentHost.Controls.Add(settingsPage);
+        _pages[overviewTab] = overview;
+        _pages[settingsTab] = settingsPage;
+        overviewTab.Click += (_, _) => SelectPage(overviewTab);
+        settingsTab.Click += (_, _) => SelectPage(settingsTab);
 
-        var navButtons = navigation.Controls.OfType<NavigationButton>().OrderBy(button => button.Top).ToArray();
-        _pages[navButtons[0]] = overview;
-        _pages[navButtons[1]] = compatibility;
-        _pages[navButtons[2]] = diagnostics;
-        _pages[navButtons[3]] = about;
-        foreach (var button in navButtons)
-        {
-            button.Click += (_, _) => SelectPage(button);
-        }
+        Controls.Add(root);
+        root.Controls.Add(header, 0, 0);
+        root.Controls.Add(tabs, 0, 1);
+        root.Controls.Add(contentHost, 0, 2);
 
-        SelectPage(navButtons[0]);
-
+        SelectPage(overviewTab);
         _enabledToggle.CheckedChanged += ToggleChanged;
         _startupToggle.CheckedChanged += ToggleChanged;
         _notificationsToggle.CheckedChanged += ToggleChanged;
@@ -111,11 +82,6 @@ internal sealed class SettingsForm : Form
         {
             eventArgs.Cancel = true;
             Hide();
-        };
-        Resize += (_, _) =>
-        {
-            _maximizeButton.Text = WindowState == FormWindowState.Maximized ? "\uE923" : "\uE922";
-            Padding = WindowState == FormWindowState.Maximized ? new Padding(7) : Padding.Empty;
         };
 
         ApplySettings(settings);
@@ -137,16 +103,12 @@ internal sealed class SettingsForm : Form
     {
         _startupToggle.Enabled = !managed;
         _startupToggle.Cursor = managed ? Cursors.Default : Cursors.Hand;
-        if (_startupToggle.Parent is Control startupRow)
-        {
-            startupRow.Cursor = managed ? Cursors.Default : Cursors.Hand;
-        }
         _startupToggle.AccessibleDescription = managed
             ? "Managed for all users by your administrator."
             : "Launch PWADrop automatically when you sign in.";
-        if (_startupToggle.Tag is Label descriptionLabel)
+        if (_startupToggle.Tag is Label description)
         {
-            descriptionLabel.Text = _startupToggle.AccessibleDescription;
+            description.Text = _startupToggle.AccessibleDescription;
         }
     }
 
@@ -162,12 +124,13 @@ internal sealed class SettingsForm : Form
         var paused = status.Equals("Bridge paused", StringComparison.OrdinalIgnoreCase);
         _statusTitle.Text = status;
         _statusSubtitle.Text = active
-            ? "Drag priming is ready."
+            ? "Ready when you drag. PWADrop can stay quietly in the notification area."
             : paused
-                ? "Enable the bridge when you are ready."
-                : "PWADrop is handling the current drag.";
+                ? "Turn the bridge on when you want delayed file drags prepared."
+                : "PWADrop is preparing the current drag.";
         _statusGlyph.Text = active ? "\uE930" : paused ? "\uE769" : "\uE895";
         _statusGlyph.ForeColor = active ? FluentTheme.Success : paused ? FluentTheme.Warning : FluentTheme.Accent;
+        LayoutStatusHeader();
     }
 
     internal void RenderTo(string path, string pageName = "Overview", Size? renderSize = null)
@@ -178,21 +141,15 @@ internal sealed class SettingsForm : Form
             Directory.CreateDirectory(directory);
         }
 
-        Size = renderSize ?? new Size(1034, 782);
+        Size = renderSize ?? new Size(920, 760);
         SelectPage(pageName);
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
         Location = new Point(-32000, -32000);
         Show();
         Application.DoEvents();
-        PerformLayout();
-        Refresh();
-        foreach (Control child in Controls)
-        {
-            child.CreateControl();
-            child.PerformLayout();
-            child.Refresh();
-        }
+        PrepareForRender(this);
+        Application.DoEvents();
 
         using var bitmap = new Bitmap(Width, Height);
         DrawToBitmap(bitmap, new Rectangle(Point.Empty, Size));
@@ -205,7 +162,6 @@ internal sealed class SettingsForm : Form
         if (disposing)
         {
             _brandBitmap.Dispose();
-            _bridgeBitmap.Dispose();
         }
 
         base.Dispose(disposing);
@@ -233,641 +189,404 @@ internal sealed class SettingsForm : Form
         return base.ProcessCmdKey(ref message, keyData);
     }
 
-    protected override void WndProc(ref Message message)
+    private Panel CreateHeader()
     {
-        if (message.Msg == NativeMethods.WmNcHitTest)
-        {
-            base.WndProc(ref message);
-            if ((int)message.Result == NativeMethods.HtClient)
-            {
-                var screenPoint = new Point(
-                    unchecked((short)((long)message.LParam & 0xFFFF)),
-                    unchecked((short)(((long)message.LParam >> 16) & 0xFFFF)));
-                var point = PointToClient(screenPoint);
-                message.Result = (IntPtr)HitTest(point);
-            }
-
-            return;
-        }
-
-        base.WndProc(ref message);
-    }
-
-    private Panel CreateTitleBar()
-    {
-        var titleBar = new Panel
+        var header = new Panel
         {
             Dock = DockStyle.Fill,
-            Height = TitleBarHeight,
             BackColor = FluentTheme.Navigation,
             Margin = Padding.Empty
         };
-
-        var logo = new PictureBox
+        header.Controls.Add(new PictureBox
         {
-            Image = BrandIcon.CreateBitmap(34),
+            Image = _brandBitmap,
             SizeMode = PictureBoxSizeMode.Zoom,
-            Location = new Point(20, 10),
-            Size = new Size(34, 34),
+            Location = new Point(24, 18),
+            Size = new Size(64, 64),
             AccessibleName = "PWADrop logo",
             TabStop = false
-        };
-        var productName = new Label
+        });
+        header.Controls.Add(new Label
         {
             Text = "PWADrop",
             AutoSize = true,
-            Font = FluentTheme.Text(13.5f),
+            Font = FluentTheme.Display(20f, FontStyle.Bold),
             ForeColor = FluentTheme.TextPrimary,
-            Location = new Point(66, 17)
-        };
-
-        var closeButton = CreateWindowButton("\uE8BB", "Close", (_, _) => Hide(), true);
-        _maximizeButton = CreateWindowButton("\uE922", "Maximize or restore", (_, _) => ToggleMaximize());
-        var minimizeButton = CreateWindowButton("\uE921", "Minimize", (_, _) => WindowState = FormWindowState.Minimized);
-        closeButton.Dock = DockStyle.Right;
-        _maximizeButton.Dock = DockStyle.Right;
-        minimizeButton.Dock = DockStyle.Right;
-
-        titleBar.Controls.Add(minimizeButton);
-        titleBar.Controls.Add(_maximizeButton);
-        titleBar.Controls.Add(closeButton);
-        titleBar.Controls.Add(productName);
-        titleBar.Controls.Add(logo);
-        return titleBar;
+            Location = new Point(104, 22)
+        });
+        header.Controls.Add(new Label
+        {
+            Text = "Drag files between modern apps",
+            AutoSize = true,
+            Font = FluentTheme.Text(10.5f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(106, 58)
+        });
+        return header;
     }
 
-    private static Panel CreateNavigation()
+    private static Panel CreateTabs(out FluentTabButton overview, out FluentTabButton settings)
     {
-        var navigation = new Panel
+        var tabs = new Panel
         {
             Dock = DockStyle.Fill,
             BackColor = FluentTheme.Navigation,
-            Padding = new Padding(14, 28, 14, 22),
             Margin = Padding.Empty
         };
-
-        var overview = CreateNavigationButton("Overview", "\uE80F", 35);
-        var compatibility = CreateNavigationButton("Compatibility", "\uEA86", 99);
-        var diagnostics = CreateNavigationButton("Diagnostics", "\uE95E", 163);
-        var separator = new Panel
+        overview = new FluentTabButton("Overview", "\uE80F")
         {
-            Location = new Point(24, 231),
-            Size = new Size(NavigationWidth - 48, 1),
-            BackColor = FluentTheme.Stroke,
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            Location = new Point(24, 2),
+            Size = new Size(138, 52)
         };
-        var about = CreateNavigationButton("About", "\uE946", 251);
-
-        navigation.Controls.Add(overview);
-        navigation.Controls.Add(compatibility);
-        navigation.Controls.Add(diagnostics);
-        navigation.Controls.Add(separator);
-        navigation.Controls.Add(about);
-        return navigation;
+        settings = new FluentTabButton("Settings", "\uE713")
+        {
+            Location = new Point(168, 2),
+            Size = new Size(132, 52)
+        };
+        tabs.Controls.Add(overview);
+        tabs.Controls.Add(settings);
+        return tabs;
     }
 
     private Control CreateOverviewPage(
         out FluentToggle enabledToggle,
-        out FluentToggle startupToggle,
-        out FluentToggle notificationsToggle,
         out Label statusTitle,
         out Label statusSubtitle,
         out Label statusGlyph)
     {
-        var page = CreatePage();
-        page.Padding = new Padding(30, 0, 64, 0);
-        var layout = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 6,
-            BackColor = Color.Transparent,
-            Margin = Padding.Empty,
-            Padding = Padding.Empty
-        };
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 280));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 1));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 130));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 104));
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        page.Controls.Add(layout);
-
-        var hero = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
-        var brand = new PictureBox
-        {
-            Image = _bridgeBitmap,
-            SizeMode = PictureBoxSizeMode.Zoom,
-            Size = new Size(280, 116),
-            Anchor = AnchorStyles.None,
-            AccessibleName = "PWADrop bridge mark"
-        };
-        var heroStatusGlyph = new Label
-        {
-            Text = "\uE930",
-            Font = FluentTheme.Symbols(30f),
-            ForeColor = FluentTheme.Success,
-            AutoSize = true,
-            Anchor = AnchorStyles.None,
-            AccessibleName = "Bridge status"
-        };
-        var heroStatusTitle = new Label
-        {
-            Text = "Bridge active",
-            Font = FluentTheme.Display(31f, FontStyle.Bold),
-            ForeColor = FluentTheme.TextPrimary,
-            AutoSize = true,
-            Anchor = AnchorStyles.None
-        };
-        var heroStatusSubtitle = new Label
-        {
-            Text = "Drag priming is ready.",
-            Font = FluentTheme.Text(14.5f),
-            ForeColor = FluentTheme.TextSecondary,
-            AutoSize = true,
-            Anchor = AnchorStyles.None
-        };
-
-        hero.Controls.Add(brand);
-        hero.Controls.Add(heroStatusGlyph);
-        hero.Controls.Add(heroStatusTitle);
-        hero.Controls.Add(heroStatusSubtitle);
-        hero.Resize += (_, _) => LayoutHero(hero, brand, heroStatusGlyph, heroStatusTitle, heroStatusSubtitle);
-        layout.Controls.Add(hero, 0, 0);
-        layout.Controls.Add(new Panel { Dock = DockStyle.Fill, BackColor = FluentTheme.Stroke }, 0, 1);
-
-        var enabledRow = CreateSettingRow(
-            "Enable drag bridge",
-            "Prepare delayed files for reliable dropping into apps.",
-            null,
-            out enabledToggle);
-        var startupRow = CreateSettingRow(
-            "Start with Windows",
-            "Launch PWADrop automatically when you sign in.",
-            "\uE7E8",
-            out startupToggle);
-        var notificationsRow = CreateSettingRow(
-            "Show status notifications",
-            "Get notified when the bridge is active or has issues.",
-            "\uEA8F",
-            out notificationsToggle,
-            drawBottomBorder: false);
-        layout.Controls.Add(enabledRow, 0, 2);
-        layout.Controls.Add(startupRow, 0, 3);
-        layout.Controls.Add(notificationsRow, 0, 4);
-        statusGlyph = heroStatusGlyph;
-        statusTitle = heroStatusTitle;
-        statusSubtitle = heroStatusSubtitle;
-        return page;
-    }
-
-    private static Control CreateCompatibilityPage()
-    {
-        var page = CreatePage();
-        var header = CreatePageHeader(
-            "Compatibility",
-            "PWADrop bridges delayed file drags from supported Chromium and WebView2 apps into ordinary Windows drop targets.");
-        page.Controls.Add(header);
-
-        var cards = new TableLayoutPanel
-        {
-            Location = new Point(44, 142),
-            Size = new Size(680, 392),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            ColumnCount = 1,
-            RowCount = 3,
-            BackColor = Color.Transparent
-        };
-        cards.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
-        cards.RowStyles.Add(new RowStyle(SizeType.Percent, 33.333f));
-        cards.RowStyles.Add(new RowStyle(SizeType.Percent, 33.334f));
-        cards.Controls.Add(CreateCompatibilityCard("\uE774", "Chromium and WebView2 sources", "Edge, Chrome, installed browser apps, and recognized WebView2 hosts."), 0, 0);
-        cards.Controls.Add(CreateCompatibilityCard("\uE8A5", "Browser destinations", "Standard HTML file-upload and drag-and-drop surfaces in current browsers."), 0, 1);
-        cards.Controls.Add(CreateCompatibilityCard("\uE943", ".NET and Windows destinations", "WinForms, WPF, File Explorer, and other applications that accept normal file paths."), 0, 2);
-        page.Controls.Add(cards);
-        return page;
-    }
-
-    private static Control CreateDiagnosticsPage(string cachePath, string diagnosticsPath)
-    {
-        var page = CreatePage();
-        page.Controls.Add(CreatePageHeader(
-            "Diagnostics",
-            "Inspect local bridge activity and temporary compatibility files without leaving PWADrop running in the foreground."));
-
-        var diagnosticsCard = CreateActionCard(
-            "\uE9D9",
-            "Diagnostic log",
-            "Open the redacted local event log used for troubleshooting.",
-            "Open diagnostics",
-            (_, _) => OpenPath(diagnosticsPath, createFile: true));
-        diagnosticsCard.Location = new Point(44, 150);
-        diagnosticsCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        diagnosticsCard.Width = 680;
-
-        var cacheCard = CreateActionCard(
-            "\uE8B7",
-            "Compatibility cache",
-            "Open temporary files created only for legacy virtual-file sources.",
-            "Open cache",
-            (_, _) => OpenPath(cachePath, createFile: false));
-        cacheCard.Location = new Point(44, 300);
-        cacheCard.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
-        cacheCard.Width = 680;
-
-        page.Controls.Add(diagnosticsCard);
-        page.Controls.Add(cacheCard);
-        page.Resize += (_, _) =>
-        {
-            diagnosticsCard.Width = Math.Max(520, page.ClientSize.Width - 88);
-            cacheCard.Width = Math.Max(520, page.ClientSize.Width - 88);
-        };
-        return page;
-    }
-
-    private Control CreateAboutPage()
-    {
-        var page = CreatePage();
-        var identity = new TableLayoutPanel
-        {
-            Location = new Point(44, 54),
-            Size = new Size(680, 96),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            ColumnCount = 2,
-            RowCount = 2,
-            BackColor = Color.Transparent,
-            Margin = Padding.Empty,
-            Padding = Padding.Empty,
-            GrowStyle = TableLayoutPanelGrowStyle.FixedSize
-        };
-        identity.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
-        identity.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        identity.RowStyles.Add(new RowStyle(SizeType.Absolute, 60));
-        identity.RowStyles.Add(new RowStyle(SizeType.Absolute, 36));
+        var page = CreateScrollablePage();
+        var statusCard = new FluentCard { Height = 252, Margin = new Padding(0, 0, 0, 16) };
         var logo = new PictureBox
         {
             Image = _brandBitmap,
             SizeMode = PictureBoxSizeMode.Zoom,
-            Size = new Size(88, 88),
-            AccessibleName = "PWADrop logo",
-            Anchor = AnchorStyles.Top | AnchorStyles.Left,
-            Margin = Padding.Empty
+            Size = new Size(94, 94),
+            AccessibleName = "PWADrop bridge mark"
         };
-        var title = new Label
+        statusGlyph = new Label
         {
-            Text = "PWADrop",
-            Font = FluentTheme.Display(26f, FontStyle.Bold),
+            Text = "\uE930",
+            Font = FluentTheme.Symbols(15f),
+            ForeColor = FluentTheme.Success,
+            AutoSize = true,
+            AccessibleName = "Bridge status",
+            Tag = statusCard
+        };
+        statusTitle = new Label
+        {
+            Text = "Bridge active",
+            Font = FluentTheme.Display(24f, FontStyle.Bold),
             ForeColor = FluentTheme.TextPrimary,
-            Dock = DockStyle.Fill,
-            AutoSize = false,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Margin = new Padding(14, 0, 0, 0)
+            AutoSize = true,
+            Tag = logo
         };
-        var version = new Label
+        statusSubtitle = new Label
         {
-            Text = $"Version {GetDisplayVersion()}",
-            Font = FluentTheme.Text(10.5f),
-            ForeColor = FluentTheme.TextSecondary,
-            Dock = DockStyle.Fill,
-            AutoSize = false,
-            AutoEllipsis = true,
-            TextAlign = ContentAlignment.TopLeft,
-            Margin = new Padding(18, 0, 0, 0)
-        };
-        identity.Controls.Add(logo, 0, 0);
-        identity.SetRowSpan(logo, 2);
-        identity.Controls.Add(title, 1, 0);
-        identity.Controls.Add(version, 1, 1);
-        var description = new Label
-        {
-            Text = "A source-available Windows bridge for dragging delayed files between modern apps.",
+            Text = "Ready when you drag. PWADrop can stay quietly in the notification area.",
             Font = FluentTheme.Text(11f),
             ForeColor = FluentTheme.TextSecondary,
-            Location = new Point(48, 176),
-            Size = new Size(660, 52),
-            AutoEllipsis = true,
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            AutoSize = false,
+            TextAlign = ContentAlignment.TopCenter,
+            Height = 46
         };
-        var license = new Label
+        statusCard.Controls.Add(logo);
+        statusCard.Controls.Add(statusGlyph);
+        statusCard.Controls.Add(statusTitle);
+        statusCard.Controls.Add(statusSubtitle);
+        var statusGlyphLabel = statusGlyph;
+        var statusTitleLabel = statusTitle;
+        var statusSubtitleLabel = statusSubtitle;
+        statusCard.Resize += (_, _) => LayoutStatusCard(
+            statusCard,
+            logo,
+            statusGlyphLabel,
+            statusTitleLabel,
+            statusSubtitleLabel);
+
+        var bridgeCard = CreateToggleCard(
+            "Enable drag bridge",
+            "Prepare delayed files so ordinary Windows drop targets can receive them.",
+            "\uE7C3",
+            out enabledToggle);
+        bridgeCard.Margin = new Padding(0, 0, 0, 16);
+
+        var note = new FluentCard { Height = 92, Margin = Padding.Empty };
+        var noteText = new Label
         {
-            Text = "Licensed for non-commercial use under PolyForm Noncommercial 1.0.0.",
+            Text = "You can close this window. PWADrop keeps working from the notification area.",
             Font = FluentTheme.Text(10.5f),
             ForeColor = FluentTheme.TextSecondary,
-            Location = new Point(48, 242),
-            AutoSize = true
+            AutoSize = false,
+            Location = new Point(64, 24),
+            Height = 44,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
-        var projectButton = CreateActionButton("Open project on GitHub", (_, _) =>
-            Process.Start(new ProcessStartInfo("https://github.com/LowkeyNEXT/PwaDrop") { UseShellExecute = true }));
-        projectButton.Width = 184;
-        projectButton.Location = new Point(48, 292);
+        note.Controls.Add(new Label
+        {
+            Text = "\uE946",
+            Font = FluentTheme.Symbols(18f),
+            ForeColor = FluentTheme.Accent,
+            Location = new Point(24, 29),
+            AutoSize = true
+        });
+        note.Controls.Add(noteText);
+        note.Resize += (_, _) => noteText.Width = Math.Max(220, note.ClientSize.Width - 88);
 
-        page.Controls.Add(identity);
-        page.Controls.Add(description);
-        page.Controls.Add(license);
-        page.Controls.Add(projectButton);
+        page.Controls.Add(statusCard);
+        page.Controls.Add(bridgeCard);
+        page.Controls.Add(note);
+        BindPageWidths(page, statusCard, bridgeCard, note);
         return page;
     }
 
-    private static Panel CreatePage()
+    private Control CreateSettingsPage(out FluentToggle startupToggle, out FluentToggle notificationsToggle)
     {
-        return new Panel
+        var page = CreateScrollablePage();
+        var heading = CreateSectionHeading("Settings", "Choose how PWADrop behaves on this PC.");
+
+        var general = new FluentCard { Height = 202, Margin = new Padding(0, 0, 0, 16), Padding = Padding.Empty };
+        var startupRow = CreateToggleRow(
+            "Start with Windows",
+            "Launch PWADrop automatically when you sign in.",
+            "\uE7E8",
+            out startupToggle);
+        var notificationsRow = CreateToggleRow(
+            "Show status notifications",
+            "Show a notification when the bridge needs your attention.",
+            "\uEA8F",
+            out notificationsToggle);
+        startupRow.Dock = DockStyle.Top;
+        notificationsRow.Dock = DockStyle.Bottom;
+        general.Controls.Add(notificationsRow);
+        general.Controls.Add(startupRow);
+
+        var help = new FluentCard { Height = 176, Margin = new Padding(0, 0, 0, 16) };
+        help.Controls.Add(CreateCardTitle("Help & information", "\uE897"));
+        help.Controls.Add(CreateLink("Compatibility guide", ProductSite + "#compatibility", 64));
+        help.Controls.Add(CreateLink("Frequently asked questions", ProductSite + "faq/", 96));
+        help.Controls.Add(CreateLink("Privacy policy", ProductSite + "privacy/", 128));
+
+        var about = new FluentCard { Height = 106, Margin = Padding.Empty };
+        about.Controls.Add(new PictureBox
         {
-            Dock = DockStyle.Fill,
-            BackColor = FluentTheme.Canvas,
-            Visible = false
-        };
+            Image = _brandBitmap,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Location = new Point(22, 19),
+            Size = new Size(66, 66),
+            AccessibleName = "PWADrop logo"
+        });
+        about.Controls.Add(new Label
+        {
+            Text = "PWADrop",
+            Font = FluentTheme.Text(12.5f, FontStyle.Bold),
+            ForeColor = FluentTheme.TextPrimary,
+            Location = new Point(104, 25),
+            AutoSize = true
+        });
+        about.Controls.Add(new Label
+        {
+            Text = $"Version {GetDisplayVersion()} · Built by RiddleNEXT",
+            Font = FluentTheme.Text(9.5f),
+            ForeColor = FluentTheme.TextSecondary,
+            Location = new Point(105, 54),
+            AutoSize = true
+        });
+
+        page.Controls.Add(heading);
+        page.Controls.Add(general);
+        page.Controls.Add(help);
+        page.Controls.Add(about);
+        BindPageWidths(page, heading, general, help, about);
+        return page;
     }
 
-    private static Control CreatePageHeader(string title, string subtitle)
+    private static FlowLayoutPanel CreateScrollablePage() => new()
     {
-        var header = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 126,
-            Padding = new Padding(44, 32, 44, 18),
-            BackColor = Color.Transparent
-        };
-        var titleLabel = new Label
+        Dock = DockStyle.Fill,
+        AutoScroll = true,
+        FlowDirection = FlowDirection.TopDown,
+        WrapContents = false,
+        BackColor = FluentTheme.Canvas,
+        Padding = new Padding(28, 24, 28, 24),
+        Margin = Padding.Empty
+    };
+
+    private static Panel CreateSectionHeading(string title, string subtitle)
+    {
+        var heading = new Panel { Height = 82, Margin = new Padding(0, 0, 0, 8), BackColor = Color.Transparent };
+        heading.Controls.Add(new Label
         {
             Text = title,
-            Font = FluentTheme.Display(24f, FontStyle.Bold),
+            Font = FluentTheme.Display(23f, FontStyle.Bold),
             ForeColor = FluentTheme.TextPrimary,
-            Location = new Point(44, 30),
+            Location = new Point(2, 0),
             AutoSize = true
-        };
-        var subtitleLabel = new Label
+        });
+        heading.Controls.Add(new Label
         {
             Text = subtitle,
             Font = FluentTheme.Text(10.5f),
             ForeColor = FluentTheme.TextSecondary,
-            Location = new Point(47, 76),
-            Size = new Size(650, 44),
-            AutoEllipsis = false,
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-        header.Controls.Add(titleLabel);
-        header.Controls.Add(subtitleLabel);
-        return header;
+            Location = new Point(3, 46),
+            AutoSize = true
+        });
+        return heading;
     }
 
-    private static FluentCard CreateCompatibilityCard(string glyph, string title, string description)
+    private static FluentCard CreateToggleCard(string title, string description, string glyph, out FluentToggle toggle)
     {
-        var card = new FluentCard
+        var card = new FluentCard { Height = 112, Padding = Padding.Empty };
+        var row = CreateToggleRow(title, description, glyph, out toggle);
+        row.Dock = DockStyle.Fill;
+        card.Controls.Add(row);
+        return card;
+    }
+
+    private static Panel CreateToggleRow(string title, string description, string glyph, out FluentToggle toggle)
+    {
+        var row = new Panel
         {
-            Dock = DockStyle.Fill,
-            Margin = new Padding(0, 0, 0, 12),
-            Padding = new Padding(24, 18, 24, 16)
+            Height = 100,
+            BackColor = FluentTheme.Surface,
+            Padding = Padding.Empty,
+            Cursor = Cursors.Hand
         };
         var icon = new Label
         {
             Text = glyph,
-            Font = FluentTheme.Symbols(20f),
+            Font = FluentTheme.Symbols(18f),
             ForeColor = FluentTheme.Accent,
-            Location = new Point(24, 28),
-            AutoSize = true,
-            AccessibleName = title
+            Location = new Point(24, 37),
+            AutoSize = true
         };
         var titleLabel = new Label
         {
             Text = title,
-            Font = FluentTheme.Text(11f, FontStyle.Bold),
+            Font = FluentTheme.Text(11.5f, FontStyle.Bold),
             ForeColor = FluentTheme.TextPrimary,
-            Location = new Point(76, 20),
+            Location = new Point(66, 23),
             AutoSize = true
         };
         var descriptionLabel = new Label
         {
             Text = description,
-            Font = FluentTheme.Text(9.8f),
+            Font = FluentTheme.Text(9.5f),
             ForeColor = FluentTheme.TextSecondary,
-            Location = new Point(78, 52),
-            Size = new Size(560, 44),
+            Location = new Point(67, 53),
+            AutoSize = false,
+            Height = 28,
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
         };
-        card.Controls.Add(icon);
-        card.Controls.Add(titleLabel);
-        card.Controls.Add(descriptionLabel);
-        return card;
-    }
-
-    private static FluentCard CreateActionCard(
-        string glyph,
-        string title,
-        string description,
-        string action,
-        EventHandler click)
-    {
-        var card = new FluentCard
+        toggle = new FluentToggle
         {
-            Height = 126,
-            Padding = new Padding(24)
-        };
-        var icon = new Label
-        {
-            Text = glyph,
-            Font = FluentTheme.Symbols(20f),
-            ForeColor = FluentTheme.Accent,
-            Location = new Point(24, 42),
-            AutoSize = true,
-            AccessibleName = title
-        };
-        var titleLabel = new Label
-        {
-            Text = title,
-            Font = FluentTheme.Text(11f, FontStyle.Bold),
-            ForeColor = FluentTheme.TextPrimary,
-            Location = new Point(76, 28),
-            AutoSize = true
-        };
-        var descriptionLabel = new Label
-        {
-            Text = description,
-            Font = FluentTheme.Text(9.8f),
-            ForeColor = FluentTheme.TextSecondary,
-            Location = new Point(78, 60),
-            Size = new Size(380, 42),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-        var button = CreateActionButton(action, click);
-        button.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        button.Location = new Point(card.Width - button.Width - 24, 43);
-        card.Resize += (_, _) => button.Left = card.ClientSize.Width - button.Width - 24;
-        card.Resize += (_, _) => descriptionLabel.Width = Math.Max(200, button.Left - descriptionLabel.Left - 18);
-        card.Controls.Add(icon);
-        card.Controls.Add(titleLabel);
-        card.Controls.Add(descriptionLabel);
-        card.Controls.Add(button);
-        return card;
-    }
-
-    private static Panel CreateSettingRow(
-        string title,
-        string description,
-        string? glyph,
-        out FluentToggle toggle,
-        bool drawBottomBorder = true)
-    {
-        var row = new SettingRow(drawBottomBorder)
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Color.Transparent,
-            Cursor = Cursors.Hand,
-            AccessibleName = title
-        };
-        var hasGlyph = !string.IsNullOrEmpty(glyph);
-        var textLeft = hasGlyph ? 100 : 34;
-        var titleTop = hasGlyph ? 34 : 25;
-        if (!string.IsNullOrEmpty(glyph))
-        {
-            var icon = new Label
-            {
-                Text = glyph,
-                Font = FluentTheme.Symbols(27f),
-                ForeColor = FluentTheme.AccentSecondary,
-                Location = new Point(34, 31),
-                AutoSize = true,
-                AccessibleName = title
-            };
-            row.Controls.Add(icon);
-        }
-
-        var titleLabel = new Label
-        {
-            Text = title,
-            Font = FluentTheme.Text(13.5f, FontStyle.Bold),
-            ForeColor = FluentTheme.TextPrimary,
-            Location = new Point(textLeft, titleTop),
-            AutoSize = true
-        };
-        var descriptionLabel = new Label
-        {
-            Text = description,
-            Font = FluentTheme.Text(12f),
-            ForeColor = FluentTheme.TextSecondary,
-            Location = new Point(textLeft + 2, titleTop + 30),
-            Size = new Size(520, 38),
-            AutoEllipsis = true,
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-        var rowToggle = new FluentToggle
-        {
-            Location = new Point(row.Width - 90, 31),
+            Size = new Size(58, 32),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
             AccessibleName = title,
-            AccessibleDescription = description
+            AccessibleDescription = description,
+            Tag = descriptionLabel
         };
-        row.Resize += (_, _) =>
-        {
-            rowToggle.Left = row.ClientSize.Width - rowToggle.Width - 4;
-            descriptionLabel.Width = Math.Max(240, rowToggle.Left - descriptionLabel.Left - 24);
-        };
-        row.Click += (_, _) => ToggleIfEnabled(rowToggle);
-        titleLabel.Click += (_, _) => ToggleIfEnabled(rowToggle);
-        descriptionLabel.Click += (_, _) => ToggleIfEnabled(rowToggle);
-
+        row.Controls.Add(icon);
         row.Controls.Add(titleLabel);
         row.Controls.Add(descriptionLabel);
-        row.Controls.Add(rowToggle);
-        rowToggle.Tag = descriptionLabel;
-        toggle = rowToggle;
+        row.Controls.Add(toggle);
+        var toggleControl = toggle;
+        row.Resize += (_, _) =>
+        {
+            toggleControl.Location = new Point(Math.Max(120, row.ClientSize.Width - 82), 34);
+            descriptionLabel.Width = Math.Max(120, toggleControl.Left - descriptionLabel.Left - 18);
+        };
+
+        void ToggleRow()
+        {
+            if (toggleControl.Enabled)
+            {
+                toggleControl.Checked = !toggleControl.Checked;
+            }
+        }
+
+        row.Click += (_, _) => ToggleRow();
+        titleLabel.Click += (_, _) => ToggleRow();
+        descriptionLabel.Click += (_, _) => ToggleRow();
+        icon.Click += (_, _) => ToggleRow();
         return row;
     }
 
-    private static void ToggleIfEnabled(FluentToggle toggle)
+    private static Panel CreateCardTitle(string title, string glyph)
     {
-        if (toggle.Enabled)
+        var header = new Panel
         {
-            toggle.Checked = !toggle.Checked;
-        }
-    }
-
-    private static NavigationButton CreateNavigationButton(string text, string glyph, int top)
-    {
-        return new NavigationButton(text, glyph)
-        {
-            Location = new Point(14, top),
-            Width = NavigationWidth - 28,
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            Location = new Point(24, 20),
+            Size = new Size(360, 34),
+            BackColor = Color.Transparent
         };
-    }
-
-    private static Button CreateWindowButton(string glyph, string accessibleName, EventHandler click, bool isClose = false)
-    {
-        var button = new Button
+        header.Controls.Add(new Label
         {
             Text = glyph,
-            AccessibleName = accessibleName,
-            AccessibleRole = AccessibleRole.PushButton,
-            Font = FluentTheme.Symbols(10f),
-            Size = new Size(46, TitleBarHeight),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = FluentTheme.Navigation,
+            Font = FluentTheme.Symbols(15f),
+            ForeColor = FluentTheme.Accent,
+            Location = new Point(0, 4),
+            AutoSize = true
+        });
+        header.Controls.Add(new Label
+        {
+            Text = title,
+            Font = FluentTheme.Text(11.5f, FontStyle.Bold),
             ForeColor = FluentTheme.TextPrimary,
-            TabStop = true,
-            Cursor = Cursors.Default
-        };
-        button.FlatAppearance.BorderSize = 0;
-        button.FlatAppearance.MouseOverBackColor = isClose ? Color.FromArgb(196, 43, 54) : FluentTheme.SurfaceHover;
-        button.FlatAppearance.MouseDownBackColor = isClose ? Color.FromArgb(151, 32, 42) : FluentTheme.SurfacePressed;
-        button.Click += click;
-        return button;
+            Location = new Point(40, 3),
+            AutoSize = true
+        });
+        return header;
     }
 
-    private static Button CreateActionButton(string text, EventHandler click)
+    private static LinkLabel CreateLink(string text, string url, int top)
     {
-        var button = new Button
+        var link = new LinkLabel
         {
-            Text = text,
-            AutoSize = false,
-            Size = new Size(152, 38),
-            FlatStyle = FlatStyle.Flat,
-            BackColor = FluentTheme.Accent,
-            ForeColor = Color.White,
-            Font = FluentTheme.Text(9.5f, FontStyle.Bold),
-            Cursor = Cursors.Hand,
-            AccessibleName = text
+            Text = text + "  →",
+            Font = FluentTheme.Text(10f),
+            LinkColor = Color.FromArgb(128, 174, 255),
+            ActiveLinkColor = Color.White,
+            VisitedLinkColor = Color.FromArgb(128, 174, 255),
+            Location = new Point(25, top),
+            AutoSize = true,
+            Cursor = Cursors.Hand
         };
-        button.FlatAppearance.BorderSize = 0;
-        button.FlatAppearance.MouseOverBackColor = Color.FromArgb(92, 121, 255);
-        button.FlatAppearance.MouseDownBackColor = Color.FromArgb(58, 87, 222);
-        button.Click += click;
-        return button;
+        link.LinkClicked += (_, _) => OpenUrl(url);
+        return link;
     }
 
-    private static void LayoutHero(Panel hero, Control brand, Control glyph, Control title, Control subtitle)
+    private static void BindPageWidths(FlowLayoutPanel page, params Control[] controls)
     {
-        brand.Left = (hero.ClientSize.Width - brand.Width) / 2;
-        brand.Top = Math.Max(10, (hero.ClientSize.Height - 238) / 2);
-        var statusWidth = glyph.Width + 12 + title.Width;
-        glyph.Left = (hero.ClientSize.Width - statusWidth) / 2;
-        glyph.Top = brand.Bottom + 18;
-        title.Left = glyph.Right + 12;
-        title.Top = glyph.Top - 6;
-        subtitle.Left = (hero.ClientSize.Width - subtitle.Width) / 2;
-        subtitle.Top = title.Bottom + 8;
-    }
-
-    private void SelectPage(NavigationButton selected)
-    {
-        foreach (var pair in _pages)
+        void UpdateWidths()
         {
-            pair.Key.Selected = ReferenceEquals(pair.Key, selected);
-            pair.Value.Visible = ReferenceEquals(pair.Key, selected);
+            var width = Math.Max(520, page.ClientSize.Width - page.Padding.Horizontal - 4);
+            foreach (var control in controls)
+            {
+                control.Width = width;
+            }
         }
 
-        _pages[selected].BringToFront();
+        page.ClientSizeChanged += (_, _) => UpdateWidths();
+        page.HandleCreated += (_, _) => UpdateWidths();
+        UpdateWidths();
     }
 
-    private void SelectPage(string pageName)
+    private static void LayoutStatusCard(Control card, Control logo, Control glyph, Control title, Control subtitle)
     {
-        var button = _pages.Keys.FirstOrDefault(candidate =>
-            candidate.Text.Equals(pageName, StringComparison.OrdinalIgnoreCase));
-        if (button is null)
-        {
-            throw new ArgumentOutOfRangeException(nameof(pageName), pageName, "Unknown settings page.");
-        }
+        logo.Location = new Point((card.ClientSize.Width - logo.Width) / 2, 22);
+        title.Location = new Point((card.ClientSize.Width - title.Width) / 2, 126);
+        glyph.Location = new Point(Math.Max(20, title.Left - glyph.Width - 12), 135);
+        subtitle.Width = Math.Min(560, Math.Max(260, card.ClientSize.Width - 80));
+        subtitle.Location = new Point((card.ClientSize.Width - subtitle.Width) / 2, 174);
+    }
 
-        SelectPage(button);
+    private void LayoutStatusHeader()
+    {
+        if (_statusGlyph.Tag is Control card && _statusTitle.Tag is Control logo)
+        {
+            LayoutStatusCard(card, logo, _statusGlyph, _statusTitle, _statusSubtitle);
+        }
     }
 
     private void ToggleChanged(object? sender, EventArgs eventArgs)
@@ -878,78 +597,68 @@ internal sealed class SettingsForm : Form
         }
 
         SettingsChanged?.Invoke(new AppSettings(
-            _enabledToggle.Checked,
-            _startupToggle.Checked,
-            _notificationsToggle.Checked));
+            Enabled: _enabledToggle.Checked,
+            StartWithWindows: _startupToggle.Checked,
+            ShowStatusNotifications: _notificationsToggle.Checked));
     }
 
-    private void ToggleMaximize()
+    private void SelectPage(FluentTabButton selected)
     {
-        WindowState = WindowState == FormWindowState.Maximized
-            ? FormWindowState.Normal
-            : FormWindowState.Maximized;
-    }
-
-    private int HitTest(Point point)
-    {
-        const int resizeBorder = 8;
-        var left = point.X < resizeBorder;
-        var right = point.X >= ClientSize.Width - resizeBorder;
-        var top = point.Y < resizeBorder;
-        var bottom = point.Y >= ClientSize.Height - resizeBorder;
-
-        if (top && left) return NativeMethods.HtTopLeft;
-        if (top && right) return NativeMethods.HtTopRight;
-        if (bottom && left) return NativeMethods.HtBottomLeft;
-        if (bottom && right) return NativeMethods.HtBottomRight;
-        if (left) return NativeMethods.HtLeft;
-        if (right) return NativeMethods.HtRight;
-        if (top) return NativeMethods.HtTop;
-        if (bottom) return NativeMethods.HtBottom;
-        if (point.Y < TitleBarHeight && point.X < ClientSize.Width - 138) return NativeMethods.HtCaption;
-        return NativeMethods.HtClient;
-    }
-
-    private static void OpenPath(string path, bool createFile)
-    {
-        var directory = createFile ? Path.GetDirectoryName(path) : path;
-        if (!string.IsNullOrEmpty(directory))
+        foreach (var pair in _pages)
         {
-            Directory.CreateDirectory(directory);
+            pair.Key.Selected = pair.Key == selected;
+            pair.Value.Visible = pair.Key == selected;
+            if (pair.Value.Visible)
+            {
+                pair.Value.BringToFront();
+            }
+        }
+    }
+
+    private void SelectPage(string pageName)
+    {
+        var pair = _pages.FirstOrDefault(candidate =>
+            candidate.Key.Text.Equals(pageName, StringComparison.OrdinalIgnoreCase));
+        if (pair.Key is not null)
+        {
+            SelectPage(pair.Key);
+        }
+    }
+
+    private static void OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // A locked-down device may prevent opening the default browser.
+        }
+    }
+
+    private static void PrepareForRender(Control control)
+    {
+        control.CreateControl();
+        control.PerformLayout();
+        foreach (Control child in control.Controls)
+        {
+            PrepareForRender(child);
         }
 
-        if (createFile && !File.Exists(path))
-        {
-            File.WriteAllText(path, string.Empty);
-        }
-
-        Process.Start(new ProcessStartInfo(createFile ? "notepad.exe" : "explorer.exe", path) { UseShellExecute = true });
+        control.Refresh();
     }
 
     private static string GetDisplayVersion()
     {
-        var informationalVersion = typeof(SettingsForm).Assembly
+        var value = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion;
-        var version = string.IsNullOrWhiteSpace(informationalVersion)
-            ? Application.ProductVersion
-            : informationalVersion;
-        var buildMetadata = version.IndexOf('+');
-        return buildMetadata >= 0 ? version[..buildMetadata] : version;
-    }
-
-    private sealed class SettingRow(bool drawBottomBorder) : Panel
-    {
-        protected override void OnPaint(PaintEventArgs eventArgs)
+        if (string.IsNullOrWhiteSpace(value))
         {
-            base.OnPaint(eventArgs);
-            if (!drawBottomBorder)
-            {
-                return;
-            }
-
-            using var pen = new Pen(FluentTheme.Stroke, 1f);
-            eventArgs.Graphics.DrawLine(pen, 0, Height - 1, Width, Height - 1);
+            value = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
         }
+
+        return (value ?? "Development").Split('+')[0];
     }
 }

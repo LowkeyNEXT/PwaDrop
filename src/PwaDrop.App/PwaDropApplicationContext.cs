@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Runtime.InteropServices;
 using PwaDrop.App.Brand;
 using PwaDrop.App.Diagnostics;
@@ -65,11 +64,6 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
         menu.Items.Add("Open PWADrop", null, (_, _) => ShowSettings());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(_enabledMenuItem);
-        menu.Items.Add(new ToolStripSeparator());
-        var diagnosticsMenu = new ToolStripMenuItem("Diagnostics");
-        diagnosticsMenu.DropDownItems.Add("Open diagnostic log", null, (_, _) => OpenDiagnostics());
-        diagnosticsMenu.DropDownItems.Add("Open compatibility cache", null, (_, _) => OpenCache());
-        menu.Items.Add(diagnosticsMenu);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Exit());
 
@@ -174,7 +168,7 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
 
     private SettingsForm CreateSettingsForm()
     {
-        var form = new SettingsForm(_settings, _cache.RootPath, _diagnostics.Path);
+        var form = new SettingsForm(_settings);
         form.SetStartupManaged(_startupManaged);
         form.SettingsChanged += settings => ApplySettings(settings);
         return form;
@@ -214,29 +208,6 @@ internal sealed class PwaDropApplicationContext : ApplicationContext
             "PWADrop",
             $"{message} Error 0x{errorCode:X8}.",
             ToolTipIcon.Warning);
-    }
-
-    private void OpenCache()
-    {
-        Directory.CreateDirectory(_cache.RootPath);
-        Process.Start(new ProcessStartInfo("explorer.exe", _cache.RootPath)
-        {
-            UseShellExecute = true
-        });
-    }
-
-    private void OpenDiagnostics()
-    {
-        Directory.CreateDirectory(_dataPath);
-        if (!File.Exists(_diagnostics.Path))
-        {
-            File.WriteAllText(_diagnostics.Path, string.Empty);
-        }
-
-        Process.Start(new ProcessStartInfo("notepad.exe", _diagnostics.Path)
-        {
-            UseShellExecute = true
-        });
     }
 
     private void Exit()

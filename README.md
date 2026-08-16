@@ -8,7 +8,7 @@
 
 PWADrop is a source-available Windows utility that turns asynchronous Chromium and WebView2 file drags into normal Windows file drops. It fills the gap where a file can be dragged from a modern app to File Explorer, but not directly into a browser upload target, a ticket, or another Windows application.
 
-[Website](https://lowkeynext.github.io/PwaDrop/) · [Privacy policy](https://lowkeynext.github.io/PwaDrop/privacy/) · [FAQ](https://lowkeynext.github.io/PwaDrop/faq/)
+[Website](https://lowkeynext.github.io/PwaDrop/) · [Compatibility](https://lowkeynext.github.io/PwaDrop/#compatibility) · [Privacy policy](https://lowkeynext.github.io/PwaDrop/privacy/) · [FAQ](https://lowkeynext.github.io/PwaDrop/faq/)
 
 ![PWADrop settings window](docs/images/PWADrop-settings.png)
 
@@ -24,7 +24,7 @@ PWADrop is a source-available Windows utility that turns asynchronous Chromium a
 - Materializes delayed `CF_HDROP`, completes the source's async operation, and continues the original drag with a normal file-drop wrapper that hides Chromium's renderer-taint marker.
 - Leaves the original source-to-destination OLE drag intact; PWADrop does not cover the desktop or synthesize a second drag.
 - Uses no Outlook add-in, browser extension, authentication token, or network client.
-- Records only redacted hook timing and HRESULT diagnostics under `%LOCALAPPDATA%\PwaDrop`.
+- Keeps a small, automatically pruned local troubleshooting log under `%LOCALAPPDATA%\PwaDrop`.
 
 ## How it works
 
@@ -75,7 +75,7 @@ Production installers must be Authenticode-signed. Windows Smart App Control, Sm
 - **Current user** is the default and requires no administrator access. PWADrop installs under `%LOCALAPPDATA%\Programs\PWADrop`.
 - **All users** is available from the install-scope page and requires administrator approval. PWADrop installs under `%ProgramFiles%\PWADrop`.
 - **Start with Windows** is selected by default. A current-user install starts only for that user; an all-users install starts one normal, non-elevated PWADrop process in each interactive user session.
-- Add or remove PWADrop later through Windows **Installed apps**. Per-user settings and diagnostics remain under `%LOCALAPPDATA%\PwaDrop`.
+- Add or remove PWADrop later through Windows **Installed apps**. Per-user settings and a bounded local troubleshooting log remain under `%LOCALAPPDATA%\PwaDrop`.
 
 The installed folder contains a small private `Hook` directory because Windows must load the native bridge DLL from a real file. Users do not need to open or manage that directory. Release installers exclude PDB and other developer-only files.
 
@@ -122,7 +122,7 @@ The installer and its checksum are written under `artifacts\installer\<version>\
 
 ## Privacy and compatibility
 
-PWADrop does not authenticate to services or copy browser credentials. The source application remains responsible for producing selected data through its existing drag object. PWADrop injects a small native IAT hook only into explicitly recognized, trusted-signed source roots; diagnostic notifications contain only HRESULT-style error codes.
+PWADrop does not authenticate to services or copy browser credentials. The source application remains responsible for producing selected data through its existing drag object. PWADrop injects a small native IAT hook only into explicitly recognized, trusted-signed source roots. Its local troubleshooting log is automatically trimmed to roughly 512 KB whenever it reaches 1 MB.
 
 Web apps such as Outlook Web, Gmail, OneDrive, SharePoint, Teams web, Slack web, and custom sites are covered through their supported browser source. Any destination that accepts normal Windows `CF_HDROP` can work without a PWADrop plugin. ARM64, elevated sources, unknown Electron executables, and full enterprise-policy compatibility are not yet claimed. See the [roadmap](ROADMAP.md).
 

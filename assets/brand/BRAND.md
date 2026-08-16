@@ -1,18 +1,19 @@
 # PWADrop brand
 
-PWADrop's mark is a bridge between two application boundaries. The two white pillars represent the source and destination; the curved middle stroke represents a file crossing the boundary without a save-and-upload detour.
+PWADrop's mark shows a file crossing a short bridge into a destination point. The motion lines, handoff arc, and downward arrow make the drag-to-drop action recognizable without relying on the product name.
 
 ## Palette
 
 | Role | Hex |
 | --- | --- |
-| Electric blue | `#4A6AFF` |
-| Bridge violet | `#7D4CFF` |
+| Electric blue | `#125BFF` |
+| Bridge violet | `#6F28FF` |
+| Handoff cyan | `#13D8F4` |
 | Midnight | `#101426` |
 | Cloud white | `#FFFFFF` |
 | Success teal | `#1EA878` |
 
-Use the blue-to-violet gradient at 45 degrees for the primary mark. Use the flat blue mark when gradients are unavailable. Keep clear space around the mark equal to one quarter of its width.
+Use the blue-to-violet gradient with the cyan handoff highlight for the primary mark. Keep clear space around the mark equal to one eighth of its width, and never add text inside the icon.
 
 ## Typography and voice
 
@@ -21,4 +22,4 @@ Use the blue-to-violet gradient at 45 degrees for the primary mark. Use the flat
 - Tagline: **Drag delayed files. Drop anywhere.**
 - Voice: direct, calm, local-first, and explicit about temporary files.
 
-The generated repository hero is a marketing illustration. The SVG mark is the source of truth for application and package icons.
+`pwadrop-logo-master.png` is the source of truth for application, package, and website icons. Run `scripts/generate-brand-assets.ps1` after replacing it to regenerate every production derivative. `pwadrop-mark.svg` is a simplified flat companion for layouts that require vector artwork.
