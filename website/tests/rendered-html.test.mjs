@@ -23,6 +23,9 @@ test("server-renders the PWADrop landing page", async () => {
   assert.match(html, /Drag files from modern apps\. Drop them anywhere\./);
   assert.match(html, /No cloud account/);
   assert.match(html, /pwadrop-settings\.png/);
+  assert.match(html, /Supported source families/);
+  assert.match(html, /Google Drive/);
+  assert.match(html, /No destination plug-in/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 

@@ -64,27 +64,54 @@ export default function Home() {
 
       <section className="compatibility" id="compatibility">
         <div className="section-heading">
-          <p className="eyebrow"><span /> Built for the awkward gap</p>
-          <h2>Modern sources. Ordinary destinations.</h2>
-          <p>PWADrop is designed for delayed file drags from Chromium-based Windows apps and destinations that already accept normal files.</p>
+          <p className="eyebrow"><span /> Compatibility</p>
+          <h2>One bridge for the apps you already use.</h2>
+          <p>The current Windows build recognizes common Chromium, WebView2, and Electron source families, then hands the drag to any destination that accepts normal Windows files.</p>
         </div>
-        <div className="compat-grid">
-          <article>
-            <p className="card-kicker">Drag from</p>
-            <h3>Modern Windows apps</h3>
-            <p>New Outlook, supported browsers, web apps, and compatible desktop clients that produce files only when a drop occurs.</p>
+        <div className="compat-board">
+          <article className="compat-column">
+            <div className="compat-column-heading">
+              <span className="direction-mark" aria-hidden="true">↗</span>
+              <div><p className="card-kicker">Drag from</p><h3>Supported source families</h3></div>
+            </div>
+            <div className="app-group">
+              <strong>Browsers &amp; installed web apps</strong>
+              <p>Edge, Chrome, Brave, Chromium, Opera, Vivaldi, and compatible PWAs running through them.</p>
+            </div>
+            <div className="app-group">
+              <strong>WebView2 apps</strong>
+              <p>New Outlook and New Teams, including files and messages exposed through their Windows drag objects.</p>
+            </div>
+            <div className="app-group">
+              <strong>Recognized Electron apps</strong>
+              <p>Slack, Missive, Superhuman, and other explicitly supported, trusted application roots.</p>
+            </div>
           </article>
-          <article>
-            <p className="card-kicker">Drop into</p>
-            <h3>The targets you already use</h3>
-            <p>Browser upload zones, cloud-drive pages, creative tools, desktop software, and other standard Windows file targets.</p>
-          </article>
-          <article>
-            <p className="card-kicker">Stay local</p>
-            <h3>No PWADrop cloud</h3>
-            <p>The handoff happens on your PC. PWADrop has no account system, advertising SDK, or remote file-processing service.</p>
+          <div className="compat-bridge" aria-hidden="true"><span>PWADrop</span><b>→</b></div>
+          <article className="compat-column">
+            <div className="compat-column-heading">
+              <span className="direction-mark destination" aria-hidden="true">↓</span>
+              <div><p className="card-kicker">Drop into</p><h3>Standard file destinations</h3></div>
+            </div>
+            <div className="app-group">
+              <strong>Browser upload surfaces</strong>
+              <p>Google Drive, cloud storage, ticketing tools, compose windows, and sites that accept ordinary file drops.</p>
+            </div>
+            <div className="app-group">
+              <strong>Windows desktop apps</strong>
+              <p>File Explorer, WinForms, WPF, creative tools, and other applications that accept standard file paths.</p>
+            </div>
+            <div className="app-group">
+              <strong>No destination plug-in</strong>
+              <p>The target receives a normal Windows file drop, so it does not need to know PWADrop exists.</p>
+            </div>
           </article>
         </div>
+        <aside className="compat-note">
+          <strong>Designed for normal user sessions on Windows 11.</strong>
+          <span>Elevated apps, ARM64, security-restricted enterprise environments, and unknown Electron executables may require separate validation. App updates can also change drag behavior.</span>
+          <a href="/faq">Read compatibility FAQs <span aria-hidden="true">→</span></a>
+        </aside>
       </section>
 
       <section className="demo-section" id="demos">

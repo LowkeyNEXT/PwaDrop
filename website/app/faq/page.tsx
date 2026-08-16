@@ -14,12 +14,12 @@ const questions = [
   ["What does PWADrop fix?", "Some modern Windows apps create a file only after a destination accepts a drop. Many destinations do not complete that optional Windows negotiation. PWADrop bridges the handoff at the source so the original drag can continue as a normal file drop."],
   ["Does PWADrop upload my files?", "No. PWADrop has no remote file-processing service. Files are prepared locally. If you drop a file into a cloud service or website, that destination may upload it under its own privacy terms."],
   ["Does it require administrator access?", "No. PWADrop runs as the signed-in user and refuses elevated or cross-user source processes."],
-  ["Which apps are supported?", "PWADrop is designed for supported Chromium-based Windows sources and ordinary Windows file destinations. Compatibility varies by application version and security policy; a tested matrix and short demos will be published before launch."],
+  ["Which apps are supported?", "The current build recognizes supported Chromium browsers and PWAs, New Outlook and New Teams through WebView2, plus explicitly recognized Electron apps such as Slack. It can drop into Google Drive, browser upload zones, File Explorer, and desktop apps that accept standard Windows files. Compatibility can still vary by app version and security policy."],
   ["Why purchase it if the source is available?", "The Store edition provides a trusted Microsoft-signed install, automatic updates, simple removal, and a supported release channel. Source access supports transparency, learning, and community contributions."],
   ["Can I build it myself?", "The repository is available for study, contribution, and uses permitted by its source-available license. Building requires a Windows native and .NET development toolchain. Commercial use requires an appropriate paid license."],
   ["Is it open source?", "PWADrop is source-available under the PolyForm Noncommercial License. Because commercial use is restricted, it is not an OSI-approved open-source license."],
   ["How will paid upgrades work?", "A purchased major version is intended to remain usable perpetually and receive its bug and security fixes. A future major version with substantial new features may be sold separately."],
-  ["Does PWADrop collect telemetry?", "No custom telemetry is included today. PWADrop keeps redacted diagnostics locally. Microsoft may provide RiddleNEXT with aggregate Store acquisition, usage, and reliability reports under Microsoft’s privacy terms."],
+  ["Does PWADrop collect telemetry?", "No custom telemetry is included today. Microsoft may provide RiddleNEXT with aggregate Store acquisition, usage, and reliability reports under Microsoft’s privacy terms."],
   ["Can organizations deploy it?", "Yes. Business and enterprise licensing and deployment documentation will support per-user and managed-device scenarios, including common Windows management tools."],
 ];
 
