@@ -11,7 +11,7 @@
     "export:pages": "node scripts/export-github-pages.mjs",
     "start": "vinext start",
     "test": "npm run build && node --test tests/rendered-html.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern github-pages",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {

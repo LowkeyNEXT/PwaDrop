@@ -1,0 +1,27 @@
+/* Original product campaign artwork, with no application screenshots. */
+.marketing-figure { min-width:0; margin:0; }
+.marketing-artwork { overflow:hidden; border-radius:22px; isolation:isolate; background:#edf3f7; }
+.marketing-artwork > img { display:block; width:100%; max-width:none; height:auto; aspect-ratio:3/2; object-fit:contain; border:0; border-radius:0; box-shadow:none; }
+.marketing-figure figcaption { padding:21px 4px 0; }
+.artwork-signature { display:flex; align-items:center; gap:13px; }
+.artwork-signature > img { display:block; width:44px; height:44px; flex:0 0 44px; object-fit:contain; border:0; border-radius:0; background:none; box-shadow:none; }
+.artwork-signature strong { display:block; color:#173756; font-size:16px; font-weight:650; line-height:1.4; letter-spacing:-.015em; }
+.artwork-signature span { display:block; margin-top:4px; color:#526170; font-size:12px; line-height:1.55; }
+.marketing-figure figcaption > p { margin:17px 0 0 57px; color:#526170; font-size:11px; line-height:1.6; }
+.audio-detail { max-width:1180px; }
+.audio-intro { display:grid; grid-template-columns:.9fr 1.1fr; align-items:center; gap:46px; margin-top:30px; }
+.audio-intro .detail-product-logo { margin-top:0; width:70px; height:70px; }
+.audio-intro .section-kicker { margin-top:20px; }
+.audio-intro h1 { font-size:clamp(44px,4.6vw,64px); letter-spacing:-.04em; }
+.audio-intro .hero-lede { font-size:18px; line-height:1.7; }
+.audio-intro .requirements { margin-bottom:8px; }
+.audio-intro .price-note { margin-top:0; }
+.audio-marketing .marketing-artwork { background:#f7efe3; }
+.audio-marketing .artwork-signature strong { color:#f4e9ec; }
+.audio-marketing .artwork-signature span { color:#bec8d5; }
+.audio-marketing figcaption > p { color:#aab5c5; }
+.audio-detail .detail-body { max-width:920px; margin-top:65px; }
+@media(min-width:1001px){.pwadrop-marketing .marketing-artwork{margin-left:-16px;margin-right:-16px}.audio-marketing .marketing-artwork{margin-left:-14px;margin-right:-14px}}
+@media(max-width:1000px){.audio-intro{grid-template-columns:1fr;gap:34px}.audio-intro .marketing-figure{max-width:680px;width:100%}.audio-intro h1{max-width:640px}.audio-intro .hero-lede{max-width:640px}}
+@media(max-width:650px){.marketing-artwork{border-radius:16px}.marketing-figure figcaption{padding:18px 0 0}.artwork-signature{gap:11px;align-items:flex-start}.artwork-signature strong{font-size:15px}.artwork-signature span{font-size:12px}.marketing-figure figcaption>p{margin-top:13px;margin-left:55px}.audio-intro{margin-top:24px}.audio-intro h1{font-size:44px}.audio-intro .hero-lede{font-size:17px}.audio-detail .detail-body{margin-top:48px}}
+@media(prefers-reduced-motion:reduce){.marketing-artwork *{animation:none!important;transition:none!important}}
